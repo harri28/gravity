@@ -201,6 +201,7 @@ include '../../includes/header.php';
 <link rel="stylesheet" href="<?= $base_path ?>assets/vendor/select2/select2.min.css">
 <link rel="stylesheet" href="<?= $base_path ?>assets/css/cobro-modal.css?v=<?= @filemtime(__DIR__ . '/../../assets/css/cobro-modal.css') ?: 1 ?>">
 <?php include __DIR__ . '/_modal_cobro.php'; ?>
+<?php include __DIR__ . '/_modal_nuevo_cliente.php'; ?>
 
 <div class="app-toast-container" id="toast-container"></div>
 
@@ -872,8 +873,30 @@ function addCreditInstallmentRow() {
 function previsualizarComprobante() {
     appAlert('Previsualizar comprobante estara disponible pronto en mesas.', { tipo: 'info', titulo: 'Pronto disponible' });
 }
-function openModalNuevoCliente() {
-    appAlert('Crear nuevo cliente desde mesa estara disponible pronto. Mientras tanto, agregalo desde el modulo Clientes.', { tipo: 'info', titulo: 'Pronto disponible' });
+// openModalNuevoCliente ahora vive en _modal_nuevo_cliente.php (partial compartido).
+// Esta funcion es el "contrato" que la modal invoca despues de guardar: le pasa
+// el cliente recien creado y nosotros lo dejamos seleccionado en el Select2 de
+// la modal de cobro + lo copiamos al estado CLIENTE_SELECT que lee confirmarVenta.
+function setSelectedCliente(cliente) {
+    if (!cliente || !cliente.id) return;
+    const nombre = cliente.razon_social || cliente.nombre_completo
+        || `${cliente.nombres || ''} ${cliente.apellidos || ''}`.trim();
+    const doc    = cliente.numero_documento || cliente.ruc || cliente.dni || '';
+    CLIENTE_SELECT = { id: cliente.id, nombre, doc, ruc: cliente.ruc || null };
+
+    // Inyecta la opcion en el Select2 (sino muestra el id crudo) y la selecciona.
+    if (typeof window.jQuery !== 'undefined') {
+        const $ = window.jQuery;
+        const $sel = $('#cliente-select');
+        if ($sel.length) {
+            if (!$sel.find(`option[value="${cliente.id}"]`).length) {
+                $sel.append(new Option(`${nombre} · ${doc}`, cliente.id, true, true));
+            } else {
+                $sel.val(cliente.id);
+            }
+            $sel.trigger('change');
+        }
+    }
 }
 
 // --- Select2 del cliente (igual que el POS, pero sin crear nuevo cliente aun) ---
