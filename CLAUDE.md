@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## IMPORTANTE — Identidad del sistema
+
+**Este sistema se llama Gravity.** Es un sistema nuevo e independiente.
+
+- **DB PostgreSQL:** `gravity` (ver `config/database.php` → `DB_NAME = 'gravity'`). **Nunca** correr comandos `psql -d farmacia` — `farmacia` es la base de **otro sistema distinto**, local y en el VPS, y no se toca.
+- **Schemas sucursal:** actualmente se llaman `generic_pharma_jr_alonso_de_alvarado` y `generic_pharma_jr_lima_tambo` por herencia del copy-paste original. **"Generyc Pharma" como marca ya no existe en este contexto** — tratarlos conceptualmente como "schemas sucursal del sistema Gravity", nada más. Si en algún momento se renombran, mejor.
+- **URL local XAMPP:** `http://localhost/gravity/...` (el directorio local es `c:\xampp\htdocs\gravity`).
+- Cualquier referencia a "farmacia" o "generyc pharma" en código/comentarios/doc vieja es herencia obsoleta del fork original — ver [SISTEMA.md](SISTEMA.md) para la aclaración completa.
+
 ## Project Overview
 
 **Gravity** is a multi-tenant pharmacy Point of Sale (POS) web application built with PHP, vanilla JavaScript, and PostgreSQL. It runs on XAMPP (Apache + PHP). It integrates with Peru's SUNAT electronic invoicing system (direct SOAP and via Nubefact API).
@@ -10,32 +19,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Prerequisites**: XAMPP with Apache running, PostgreSQL 17 running with the database initialized.
 
-**Database credentials** in `config/database.php`: host `localhost:5432`, db `farmacia`, user `postgres`, pass `1234`.
+**Database credentials** in `config/database.php`: host `localhost:5432`, db `gravity`, user `postgres`, pass `1234`.
 
 **First-time production setup**:
 ```powershell
 # Create the database
-& "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -c "CREATE DATABASE farmacia;"
-# Run the one-shot deploy script
-& "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -d farmacia -f database/deploy_production.sql
-# Then visit: http://localhost/farmacia/database/setup.php for initial tenant/user setup
+& "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -c "CREATE DATABASE gravity;"
+# Run the one-shot deploy script (TODO: `database/gravity.sql` todavia no existe; hoy el deploy inicial se arma a mano desde `schema_sucursal.sql` + migraciones. Pendiente crear el script bootstrap.)
+& "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -d gravity -f database/gravity.sql
+# Then visit: http://localhost/gravity/database/setup.php for initial tenant/user setup
 ```
 
 **Applying a migration**:
 ```powershell
-$env:PGPASSWORD = "1234"; & "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -d farmacia -f database/migration_XX_name.sql
+$env:PGPASSWORD = "1234"; & "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -d gravity -f database/migration_XX_name.sql
 ```
 
 **Provisioning a new sucursal schema** (after creating the branch record via Admin UI):
 ```powershell
-$env:PGPASSWORD = "1234"; & "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -d farmacia -c "SET search_path = sucursal_001; $(Get-Content database/schema_sucursal.sql -Raw)"
+$env:PGPASSWORD = "1234"; & "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -d gravity -c "SET search_path = sucursal_001; $(Get-Content database/schema_sucursal.sql -Raw)"
 # Or in psql: SET search_path = sucursal_001; \i database/schema_sucursal.sql
 ```
 
-**Login URL**: `http://localhost/farmacia/modules/auth/login.php`  
+**Login URL**: `http://localhost/gravity/modules/auth/login.php`  
 Login is a 2-step, credentials-first flow: Username/password → then a sucursal picker scoped to that user's own tenant (see "Login flow" below for the full detail — this replaced an older 3-step "pick company → pick branch → enter credentials" wizard that leaked the full sucursal list pre-auth).
 
-**Entry point after login**: `http://localhost/farmacia/modules/ventas/index.php`  
+**Entry point after login**: `http://localhost/gravity/modules/ventas/index.php`  
 Root `index.php` routes by hostname (production has vanity subdomains per tenant, e.g. `generycpharma.genpharma.cloud`), based on whether the host has 3+ dot-labels and isn't `www`:
 - `admin.genpharma.cloud` → `modules/superadmin/login.php`.
 - 3+ labels, not `www`, first label matches an **active** `public.tenants.slug` → `modules/auth/login.php`.
@@ -181,7 +190,7 @@ Each module has `api.php` with a `switch ($action)` dispatcher:
 - `public.comprobante_tokens` (token, schema_name, venta_id) is the resolution table — it exists specifically so this page can find the right per-branch schema **without** knowing the tenant/subdomain first. The link works from the bare root domain, not the tenant subdomain.
 - The token is generated in `ventas/api.php`'s `registrar_venta` (`bin2hex(random_bytes(16))`) for every sale (ticket/boleta/factura alike) and returned as `comprobante_token` in the API response.
 - `modules/ventas/index.php`'s `enviarWhatsApp()` builds the public URL via `buildComprobanteUrl()`, which strips the tenant subdomain down to the root domain (`generycpharma.genpharma.cloud` → `genpharma.cloud`) so the link works regardless of which subdomain the sale was made from.
-- `app_public_prefix()` (`config/database.php`) computes the local-vs-production path prefix (same technique as `sunat_public_base_url()` in `config/sunat.php`) so the generated links work on both XAMPP (`/farmacia/...`) and the VPS (no prefix) without hardcoding either.
+- `app_public_prefix()` (`config/database.php`) computes the local-vs-production path prefix (same technique as `sunat_public_base_url()` in `config/sunat.php`) so the generated links work on both XAMPP (`/gravity/...`) and the VPS (no prefix) without hardcoding either.
 - Also rendered as a QR code on the printed ticket (80mm) and A4 formats (`buildTicketHTML()`/`buildTicketA4HTML()`), bottom of the receipt, 40% QR / 60% URL text split — generated client-side via the vendored `assets/vendor/qrcode/qrcode.min.js` (davidshimjs/qrcodejs), no external network call at print time. Only rendered on the real post-sale ticket (`showTicket()`), not on the pre-sale preview (no token exists yet).
 
 ### Electronic Invoicing
@@ -206,7 +215,7 @@ Two integration paths:
 
 **`comprobantes_electronicos` nota_credito columns** — `referencia_comprobante_id`, `tipo_nota_credito_id`, `codigo_tipo_nota_credito`, `motivo_nota_credito`, `descripcion_nota_credito`, `documento_modificado_*` — these power both `notas_reporte` and `crear_nota_credito`. They exist in `schema_sucursal.sql` but required `migration_23_notas_credito_comprobantes.sql` to be added to pre-existing schemas.
 
-**Auto-retry a SUNAT (worker + migration_58)** — Cuando `enviar_sunat()` falla por error de red/timeout (sin CDR, sin response_code), `registrar_venta` setea `reenvio_proximo_at = NOW() + 5 min` sobre `comprobantes_electronicos`. El script `scripts/reenviar_sunat_pendientes.php` (CLI, se corre vía cron del VPS cada 5 min) itera sobre todos los esquemas sucursal, llama a `reenviarSunatComprobante()` (en `modules/facturacion/_sunat_resend_helpers.php`) y reintenta. Max 20 intentos cada 5 min por comprobante (~1h40m). Si SUNAT devuelve rechazo permanente (response_code ≠ 0) deja de reintentar al toque. Al agotar los 20 intentos, se setea `reenvio_proximo_at = NULL` y requiere acción manual con el botón "Reenviar a SUNAT". El tab **Reenvíos SUNAT** del módulo Facturación (solo admin/gerente) muestra la lista en vivo con stats, intentos usados, próximo intento y último error. Columnas en `comprobantes_electronicos`: `reenvio_intentos`, `reenvio_proximo_at`, `reenvio_ultimo_at`, `reenvio_ultimo_error`. Crontab a configurar en el VPS: `*/5 * * * * /usr/bin/php /var/www/farmacia/scripts/reenviar_sunat_pendientes.php >> /var/log/farmacia/reenviar_sunat.log 2>&1`. El worker usa `flock()` sobre `/tmp/farmacia_reenviar_sunat.lock` para evitar superposición (una corrida puede tardar más de 5 min si varios comprobantes dan timeout de 60s cada uno). Los helpers `facturacionCargar{Comprobante,Cliente,Items}Venta` y `facturacionNormalizarAfectacionTipo`/`ExtraerResponseCode` viven en `modules/facturacion/_data_helpers.php` (compartidos entre `api.php` y `_sunat_resend_helpers.php`).
+**Auto-retry a SUNAT (worker + migration_58)** — Cuando `enviar_sunat()` falla por error de red/timeout (sin CDR, sin response_code), `registrar_venta` setea `reenvio_proximo_at = NOW() + 5 min` sobre `comprobantes_electronicos`. El script `scripts/reenviar_sunat_pendientes.php` (CLI, se corre vía cron del VPS cada 5 min) itera sobre todos los esquemas sucursal, llama a `reenviarSunatComprobante()` (en `modules/facturacion/_sunat_resend_helpers.php`) y reintenta. Max 20 intentos cada 5 min por comprobante (~1h40m). Si SUNAT devuelve rechazo permanente (response_code ≠ 0) deja de reintentar al toque. Al agotar los 20 intentos, se setea `reenvio_proximo_at = NULL` y requiere acción manual con el botón "Reenviar a SUNAT". El tab **Reenvíos SUNAT** del módulo Facturación (solo admin/gerente) muestra la lista en vivo con stats, intentos usados, próximo intento y último error. Columnas en `comprobantes_electronicos`: `reenvio_intentos`, `reenvio_proximo_at`, `reenvio_ultimo_at`, `reenvio_ultimo_error`. Crontab a configurar en el VPS: `*/5 * * * * /usr/bin/php /var/www/gravity/scripts/reenviar_sunat_pendientes.php >> /var/log/gravity/reenviar_sunat.log 2>&1` (ajustar rutas si tu layout del VPS es distinto). El worker usa `flock()` sobre `/tmp/gravity_reenviar_sunat.lock` para evitar superposición (una corrida puede tardar más de 5 min si varios comprobantes dan timeout de 60s cada uno). Los helpers `facturacionCargar{Comprobante,Cliente,Items}Venta` y `facturacionNormalizarAfectacionTipo`/`ExtraerResponseCode` viven en `modules/facturacion/_data_helpers.php` (compartidos entre `api.php` y `_sunat_resend_helpers.php`).
 
 ### Stock Transfers (Traslados)
 
