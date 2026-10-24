@@ -20,28 +20,51 @@ require_once '../../config/database.php';
 $mesaId    = intval($_GET['id']      ?? 0);
 $comandaId = intval($_GET['comanda'] ?? 0);
 
-// Resolver la comanda abierta ANTES de header: si no existe redirect
-// (evita renderizar la pagina y tener que mostrar un error feo).
-if ($mesaId || $comandaId) {
-    $db = getDB();
-    if ($comandaId) {
-        $ck = $db->prepare("SELECT id, mesa_id FROM comandas WHERE id = :c AND estado = 'abierta'");
-        $ck->execute([':c' => $comandaId]);
-    } else {
-        $ck = $db->prepare("SELECT id, mesa_id FROM comandas WHERE mesa_id = :m AND estado = 'abierta'");
-        $ck->execute([':m' => $mesaId]);
-    }
+// Resolver la mesa + (opcionalmente) la comanda abierta.
+// Si la mesa existe pero no tiene comanda abierta, renderizamos igual la
+// vista en "modo preview" (sin cronometro, sin total): la comanda se crea
+// recien cuando se agregue el primer producto desde el catalogo.
+if (!$mesaId && !$comandaId) {
+    header('Location: index.php');
+    exit;
+}
+
+$db = getDB();
+$resueltaMesaId    = 0;
+$resueltaComandaId = null;
+
+if ($comandaId) {
+    // Entrada por comanda explicita: tiene que existir y estar abierta.
+    $ck = $db->prepare("SELECT id, mesa_id FROM comandas WHERE id = :c AND estado = 'abierta'");
+    $ck->execute([':c' => $comandaId]);
     $resuelta = $ck->fetch();
     if (!$resuelta) {
-        header('Location: index.php?msg=' . urlencode('La mesa no tiene una comanda abierta.'));
+        header('Location: index.php?msg=' . urlencode('La comanda ya no esta abierta.'));
         exit;
     }
     $resueltaMesaId    = (int) $resuelta['mesa_id'];
     $resueltaComandaId = (int) $resuelta['id'];
 } else {
-    header('Location: index.php');
-    exit;
+    // Entrada por mesa: la mesa tiene que existir, pero puede no tener comanda.
+    $mk = $db->prepare("SELECT id FROM mesas WHERE id = :m AND activa = TRUE");
+    $mk->execute([':m' => $mesaId]);
+    if (!$mk->fetch()) {
+        header('Location: index.php?msg=' . urlencode('La mesa no existe o esta inactiva.'));
+        exit;
+    }
+    $resueltaMesaId = $mesaId;
+
+    $ck = $db->prepare("SELECT id FROM comandas WHERE mesa_id = :m AND estado = 'abierta'");
+    $ck->execute([':m' => $mesaId]);
+    $cRow = $ck->fetch();
+    $resueltaComandaId = $cRow ? (int) $cRow['id'] : null;
 }
+
+// Datos basicos de la mesa (numero + nombre), independientes de que haya o no
+// comanda abierta -- se usan para mostrar el header incluso en modo preview.
+$mesaInfoSt = $db->prepare("SELECT numero, nombre, capacidad FROM mesas WHERE id = :m");
+$mesaInfoSt->execute([':m' => $resueltaMesaId]);
+$mesaInfo = $mesaInfoSt->fetch() ?: ['numero' => '?', 'nombre' => '', 'capacidad' => 0];
 
 $base_path      = '../../';
 $current_module = 'ventas';
@@ -454,7 +477,10 @@ include '../../includes/header.php';
 // Estado
 // ---------------------------------------------------------------
 const MESA_ID    = <?= json_encode($resueltaMesaId) ?>;
-const COMANDA_ID = <?= json_encode($resueltaComandaId) ?>;
+// COMANDA_ID puede ser null al entrar (mesa libre sin pedidos todavia).
+// Se crea recien cuando se agrega el primer producto desde el catalogo.
+let COMANDA_ID   = <?= json_encode($resueltaComandaId) ?>;
+const MESA_INFO  = <?= json_encode(['numero' => $mesaInfo['numero'], 'nombre' => $mesaInfo['nombre']], JSON_UNESCAPED_UNICODE) ?>;
 const API = 'api.php';
 
 let COMANDA = null;
@@ -507,6 +533,16 @@ async function postJson(url, body) {
 // Carga inicial y refresh
 // ---------------------------------------------------------------
 async function cargarComanda() {
+    // Modo preview: mesa libre sin comanda abierta todavia. No se llama al
+    // backend; se renderiza el header con MESA_INFO y la lista vacia con el
+    // placeholder "Agrega el primer pedido...".
+    if (!COMANDA_ID) {
+        COMANDA = null;
+        ITEMS   = [];
+        renderHeader();
+        renderItems();
+        return;
+    }
     try {
         const d = await (await fetch(`${API}?action=comanda_detalle&id=${COMANDA_ID}`)).json();
         if (d.error) {
@@ -539,9 +575,19 @@ async function cargarProductos() {
 // Render: cabecera
 // ---------------------------------------------------------------
 function renderHeader() {
-    if (!COMANDA) return;
-    document.getElementById('mesa-num-txt').textContent = '#' + COMANDA.mesa_numero;
-    document.getElementById('mesa-nom-txt').textContent = COMANDA.mesa_nombre ? ' — ' + COMANDA.mesa_nombre : '';
+    // En modo preview (sin comanda) usamos MESA_INFO y no mostramos cronometro.
+    const numero = COMANDA ? COMANDA.mesa_numero : MESA_INFO.numero;
+    const nombre = COMANDA ? COMANDA.mesa_nombre : MESA_INFO.nombre;
+    document.getElementById('mesa-num-txt').textContent = '#' + numero;
+    document.getElementById('mesa-nom-txt').textContent = nombre ? ' — ' + nombre : '';
+
+    if (!COMANDA) {
+        document.getElementById('mesa-mozo-txt').textContent = 'Mesa libre — agrega el primer producto para abrirla';
+        const crono = document.getElementById('mesa-crono');
+        crono.textContent = '—';
+        crono.dataset.crono = '';
+        return;
+    }
     document.getElementById('mesa-mozo-txt').textContent = 'por ' + (COMANDA.usuario_apertura_nombre || '—');
     document.getElementById('mesa-crono').dataset.crono = COMANDA.hora_apertura || '';
     tickCrono();
@@ -722,6 +768,18 @@ function seleccionarUnidadMesa(unidadMedida) {
 async function agregarAlComandaConUnidad(producto, unidadMedida, cantidad) {
     if (accionEnCurso) return;
     accionEnCurso = true;
+
+    // Modo preview: la mesa no tiene comanda abierta todavia -- crearla ahora.
+    if (!COMANDA_ID) {
+        const open = await postJson(`${API}?action=abrir_comanda`, { mesa_id: MESA_ID });
+        if (open.error) {
+            accionEnCurso = false;
+            showToast(open.message || 'No se pudo abrir la mesa', 'error');
+            return;
+        }
+        COMANDA_ID = parseInt(open.id);
+    }
+
     const d = await postJson(`${API}?action=comanda_agregar_item`, {
         comanda_id: COMANDA_ID,
         producto_id: parseInt(producto.id),

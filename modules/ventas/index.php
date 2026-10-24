@@ -361,30 +361,16 @@ function updateCronometros() {
 }
 
 // ----------------------------------------------------------------
-// Abrir mesa libre -- un solo click: POST abrir_comanda + redirect.
-// Si otro mozo abrio primero (race), el server responde 409 y mostramos
-// toast; de ahi se puede refrescar y entrar como mesa ocupada.
+// Entrar a mesa libre: redirect directo, SIN crear comanda todavia.
+// La comanda recien se crea cuando el cajero agrega el primer producto
+// (asi el cronometro y el estado "ocupada" no arrancan por un click
+// accidental).
 // ----------------------------------------------------------------
 async function abrirMesaDirecto(mesaId) {
     if (abriendo) return;
     abriendo = true;
     try {
-        const r = await fetch(API + '?action=abrir_comanda', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mesa_id: mesaId }),
-        });
-        const d = await r.json();
-        if (d.error) {
-            showToast(d.message || 'No se pudo abrir la mesa', 'error');
-            // Race condition: la mesa ya tiene comanda abierta -> refrescar
-            // la grilla para que el user vea el estado real.
-            await cargarMesas();
-            return;
-        }
         window.location = `mesa.php?id=${mesaId}`;
-    } catch (err) {
-        showToast('Error de conexion', 'error');
     } finally {
         abriendo = false;
     }
