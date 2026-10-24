@@ -10,7 +10,7 @@ $base_path      = '../../';
 $required_roles = ['admin', 'gerente'];
 $current_module = 'facturacion';
 $current_page   = 'facturacion';
-$page_title     = 'Facturación — FarmaSystem';
+$page_title     = 'Facturación — Gravity';
 $breadcrumb     = '<strong>Facturación</strong>';
 
 $_tenant_info = ['ruc' => '', 'telefono' => '', 'direccion' => ''];

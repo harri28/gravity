@@ -9,7 +9,7 @@ require_once '../../config/database.php';
 $base_path      = '../../';
 $current_module = 'admin';
 $current_page   = 'admin';
-$page_title     = 'Administración — FarmaSystem';
+$page_title     = 'Administración — Gravity';
 $breadcrumb     = '<strong>Administración</strong>';
 $required_roles = ['admin', 'gerente'];
 
@@ -32,6 +32,9 @@ include '../../includes/header.php';
     </button>
     <button class="tab-btn" id="tab-sucursales" onclick="switchTab('sucursales')">
         <i class="fas fa-store"></i> Sucursales
+    </button>
+    <button class="tab-btn" id="tab-mesas" onclick="switchTab('mesas')">
+        <i class="fas fa-chair"></i> Mesas
     </button>
     <button class="tab-btn" id="tab-configuracion" onclick="switchTab('configuracion')">
         <i class="fas fa-paint-brush"></i> Configuración
@@ -102,6 +105,81 @@ include '../../includes/header.php';
                     <tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></td></tr>
                 </tbody>
             </table>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================================
+     TAB: MESAS (catalogo de mesas de la sucursal actual)
+     ====================================================== -->
+<div id="pane-mesas" style="display:none">
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">
+                <i class="fas fa-chair" style="color:var(--primary);margin-right:8px"></i>Mesas de la sucursal
+            </div>
+            <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="abrirModalMesa()">
+                <i class="fas fa-plus"></i> Nueva mesa
+            </button>
+        </div>
+        <div style="padding:0 20px 10px;font-size:.8rem;color:var(--text-muted)">
+            Catalogo editable de mesas / salas donde se abren las comandas. Numero
+            unico por sucursal; nombre y capacidad son opcionales.
+        </div>
+        <div class="table-wrap table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Numero</th>
+                        <th>Nombre</th>
+                        <th>Capacidad</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-mesas">
+                    <tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================================
+     MODAL: Mesa
+     ====================================================== -->
+<div class="modal-overlay" id="modal-mesa">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title" id="modal-mesa-titulo">Nueva mesa</h3>
+            <button class="modal-close" onclick="closeModal('modal-mesa')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="m-id">
+            <div class="row g-3">
+                <div class="col-12 col-sm-5">
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Numero *</label>
+                        <input type="text" id="m-numero" class="form-control" placeholder="Ej: 1, VIP-3" maxlength="20">
+                    </div>
+                </div>
+                <div class="col-12 col-sm-7">
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" id="m-nombre" class="form-control" placeholder="Opcional (ej: Sala Dorada)" maxlength="80">
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Capacidad (personas)</label>
+                <input type="number" id="m-capacidad" class="form-control" placeholder="Opcional" min="1" max="999">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('modal-mesa')">Cancelar</button>
+            <button class="btn btn-primary" id="btn-guardar-mesa" onclick="guardarMesa()">
+                <i class="fas fa-save"></i> Guardar
+            </button>
         </div>
     </div>
 </div>
@@ -764,11 +842,12 @@ let sucursalesList = [];
 
 // ---- Tabs ----
 function switchTab(tab) {
-    ['usuarios', 'sucursales', 'configuracion', 'auditoria', 'temas'].forEach(t => {
+    ['usuarios', 'sucursales', 'mesas', 'configuracion', 'auditoria', 'temas'].forEach(t => {
         document.getElementById('pane-' + t).style.display = t === tab ? '' : 'none';
         document.getElementById('tab-' + t).classList.toggle('active', t === tab);
     });
     if (tab === 'sucursales')    loadSucursales();
+    if (tab === 'mesas')         loadMesas();
     if (tab === 'configuracion') loadConfig();
     if (tab === 'auditoria')     loadAuditoria();
     if (tab === 'temas')         loadTema();
@@ -1086,6 +1165,116 @@ function toggleActivoSucursal(id) {
 }
 
 // ================================================================
+// MESAS (catalogo de mesas de la sucursal actual)
+// ================================================================
+
+function loadMesas() {
+    fetch(BASE + 'modules/admin/api.php?action=mesas_listar')
+        .then(r => r.json())
+        .then(data => {
+            if (data.error || !Array.isArray(data)) {
+                document.getElementById('tbody-mesas').innerHTML =
+                    '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-chair"></i><br><br>Error al cargar mesas</td></tr>';
+                return;
+            }
+            if (!data.length) {
+                document.getElementById('tbody-mesas').innerHTML =
+                    '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-chair"></i><br><br>No hay mesas registradas. Crea la primera con "Nueva mesa".</td></tr>';
+                return;
+            }
+            document.getElementById('tbody-mesas').innerHTML = data.map(m => {
+                const activa = m.activa === true || m.activa === 't';
+                const ocupada = m.comanda_abierta_id ? true : false;
+                return `<tr>
+                    <td><strong>${escH(m.numero)}</strong></td>
+                    <td style="font-size:.88rem;color:var(--text-muted)">${escH(m.nombre || '—')}</td>
+                    <td style="font-size:.88rem">${m.capacidad ? m.capacidad + ' pers.' : '—'}</td>
+                    <td>
+                        <span class="badge ${activa ? 'badge-success' : 'badge-danger'}">${activa ? 'Activa' : 'Inactiva'}</span>
+                        ${ocupada ? ' <span class="badge badge-warning" title="Comanda abierta ahora mismo">Ocupada</span>' : ''}
+                    </td>
+                    <td>
+                        <button class="btn btn-ghost btn-sm" onclick="abrirEditarMesa(${m.id},'${escH(m.numero)}','${escH(m.nombre || '')}',${m.capacidad || 'null'})" title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-ghost btn-sm" onclick="toggleActivaMesa(${m.id}, ${ocupada ? 'true' : 'false'})" title="${activa ? 'Desactivar' : 'Activar'}">
+                            <i class="fas fa-${activa ? 'ban' : 'check'}"></i>
+                        </button>
+                    </td>
+                </tr>`;
+            }).join('');
+        })
+        .catch(() => {
+            document.getElementById('tbody-mesas').innerHTML =
+                '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-chair"></i><br><br>Error al cargar mesas</td></tr>';
+            showToast('Error al cargar mesas', 'error');
+        });
+}
+
+function abrirModalMesa() {
+    document.getElementById('modal-mesa-titulo').textContent  = 'Nueva mesa';
+    document.getElementById('m-id').value         = '';
+    document.getElementById('m-numero').value     = '';
+    document.getElementById('m-nombre').value     = '';
+    document.getElementById('m-capacidad').value  = '';
+    document.getElementById('btn-guardar-mesa').innerHTML = '<i class="fas fa-save"></i> Crear mesa';
+    openModal('modal-mesa');
+    setTimeout(() => document.getElementById('m-numero').focus(), 80);
+}
+
+function abrirEditarMesa(id, numero, nombre, capacidad) {
+    document.getElementById('modal-mesa-titulo').textContent  = 'Editar mesa';
+    document.getElementById('m-id').value        = id;
+    document.getElementById('m-numero').value    = numero;
+    document.getElementById('m-nombre').value    = nombre;
+    document.getElementById('m-capacidad').value = capacidad == null ? '' : capacidad;
+    document.getElementById('btn-guardar-mesa').innerHTML = '<i class="fas fa-save"></i> Guardar cambios';
+    openModal('modal-mesa');
+}
+
+function guardarMesa() {
+    const id        = document.getElementById('m-id').value;
+    const numero    = document.getElementById('m-numero').value.trim();
+    const nombre    = document.getElementById('m-nombre').value.trim();
+    const capRaw    = document.getElementById('m-capacidad').value.trim();
+    const capacidad = capRaw === '' ? null : parseInt(capRaw, 10);
+
+    if (!numero) { showToast('El numero es requerido', 'error'); return; }
+    if (capRaw !== '' && (!Number.isInteger(capacidad) || capacidad < 1)) {
+        showToast('La capacidad debe ser un entero positivo', 'error'); return;
+    }
+
+    const btn = document.getElementById('btn-guardar-mesa');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+
+    const action = id ? 'mesa_actualizar' : 'mesa_crear';
+    const body   = id ? { id, numero, nombre, capacidad } : { numero, nombre, capacidad };
+
+    post(action, body).then(d => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> Guardar';
+        if (d.error) { showToast(d.message, 'error'); return; }
+        showToast(d.message || 'Mesa guardada', 'success');
+        closeModal('modal-mesa');
+        loadMesas();
+    });
+}
+
+function toggleActivaMesa(id, ocupada) {
+    if (ocupada) {
+        showToast('No se puede desactivar una mesa con comanda abierta. Cobra primero.', 'error');
+        return;
+    }
+    if (!confirm('¿Cambiar el estado de esta mesa?')) return;
+    post('mesa_toggle_activa', { id }).then(d => {
+        if (d.error) { showToast(d.message, 'error'); return; }
+        showToast('Estado actualizado', 'success');
+        loadMesas();
+    });
+}
+
+// ================================================================
 // CONFIGURACIÓN DE MARCA
 // ================================================================
 
@@ -1117,7 +1306,7 @@ function loadConfig() {
             document.getElementById('cfg-certificate-password').value = data.certificate_password || '';
             document.getElementById('cfg-certificate-expires-at').value = data.certificate_expires_at || '';
             document.getElementById('cfg-sunat-server').value = data.sunat_server || '3';
-            document.getElementById('cfg-nombre').value = data.nombre_sistema || 'FarmaSystem';
+            document.getElementById('cfg-nombre').value = data.nombre_sistema || 'Gravity';
             updateCertificateSummary(data.certificate_path || '');
             document.getElementById('certificate-file-name').textContent = data.certificate_path
                 ? 'Certificado guardado: ' + data.certificate_path.split('/').pop()

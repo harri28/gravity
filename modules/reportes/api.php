@@ -159,7 +159,7 @@ function reportesProductosRankingCTE(string $where): string
             FROM venta_detalles vd
             JOIN ventas v     ON v.id = vd.venta_id
             JOIN productos p  ON p.id = vd.producto_id
-            LEFT JOIN categorias cat ON cat.id = p.categoria_id
+            LEFT JOIN public.categorias cat ON cat.id = p.categoria_id
             $where
             GROUP BY p.id, p.codigo, p.nombre, cat.nombre
         ),
@@ -449,7 +449,7 @@ switch ($action) {
                             THEN ROUND((p.stock / (vel.cantidad_vendida / :dias_venta::numeric))::numeric, 1)
                             ELSE NULL END AS dias_cobertura
                 FROM productos p
-                LEFT JOIN categorias cat ON cat.id = p.categoria_id
+                LEFT JOIN public.categorias cat ON cat.id = p.categoria_id
                 $velJoin
                 $where
                 ORDER BY $orden
@@ -515,7 +515,7 @@ switch ($action) {
                 CASE WHEN p.activo THEN 'Activo' ELSE 'Inactivo' END              AS \"Estado\"
             FROM productos p
             $velJoin
-            LEFT JOIN categorias cat ON cat.id = p.categoria_id
+            LEFT JOIN public.categorias cat ON cat.id = p.categoria_id
             $where
             ORDER BY $orden
         ");
@@ -539,7 +539,7 @@ switch ($action) {
 
     case 'categorias_lista':
         try {
-            $rows = $db->query("SELECT id, nombre FROM categorias ORDER BY nombre")->fetchAll();
+            $rows = $db->query("SELECT id, nombre FROM public.categorias ORDER BY nombre")->fetchAll();
             echo json_encode($rows);
         } catch (Exception $e) {
             echo json_encode([]);
@@ -762,7 +762,7 @@ switch ($action) {
                         WHERE vd2.producto_id = p.id AND v2.estado = 'completada'
                     ) AS ultima_venta
                 FROM productos p
-                LEFT JOIN categorias cat ON cat.id = p.categoria_id
+                LEFT JOIN public.categorias cat ON cat.id = p.categoria_id
                 $where
                 ORDER BY valor_inventario DESC
             ");
@@ -807,7 +807,7 @@ switch ($action) {
                     WHERE vd2.producto_id = p.id AND v2.estado = 'completada'
                 ), 'DD/MM/YYYY'), 'Nunca')                                        AS \"Última Venta\"
             FROM productos p
-            LEFT JOIN categorias cat ON cat.id = p.categoria_id
+            LEFT JOIN public.categorias cat ON cat.id = p.categoria_id
             $where
             ORDER BY \"Valor Inmovilizado\" DESC
         ");

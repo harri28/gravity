@@ -636,6 +636,25 @@ switch ($action) {
            ->execute([':h' => password_hash($d['password_nueva'], PASSWORD_BCRYPT), ':id' => sesionId()]);
         jsonResponse(['error' => false, 'message' => 'Contraseña actualizada']);
 
+    // ---- GET: Preferencia de tema propia (superadmin) ----
+    case 'tema_get':
+        $stmt = $db->prepare("SELECT COALESCE(tema_oscuro, FALSE) AS tema_oscuro FROM public.superadmins WHERE id = :id");
+        $stmt->execute([':id' => sesionId()]);
+        $row = $stmt->fetch() ?: ['tema_oscuro' => false];
+        jsonResponse(['error' => false, 'tema_oscuro' => in_array($row['tema_oscuro'], [true, 't', 1, '1'], true)]);
+
+    // ---- POST: Guardar preferencia de tema propia (superadmin) ----
+    case 'tema_guardar':
+        $d = json_decode(file_get_contents('php://input'), true);
+        $temaOscuro = array_key_exists('tema_oscuro', $d) && (bool) $d['tema_oscuro'];
+
+        $db->prepare("UPDATE public.superadmins SET tema_oscuro = :tema WHERE id = :id")->execute([
+            ':tema' => $temaOscuro ? 'true' : 'false',
+            ':id'   => sesionId(),
+        ]);
+
+        jsonResponse(['error' => false, 'message' => 'Tema guardado correctamente']);
+
     // ---- POST: Subir logo de un tenant ----
     case 'tenant_logo_upload':
         $tenant_id = intval($_POST['tenant_id'] ?? 0);

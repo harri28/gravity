@@ -54,13 +54,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $prev_username = htmlspecialchars($_POST['username'] ?? '');
+$__bgPath = __DIR__ . '/../../assets/img/gravity-bg.jpg';
+$__bgVer = @filemtime($__bgPath) ?: 0;
+$__bgUrl = (function_exists('app_public_prefix') ? app_public_prefix() : '/gravity') . '/assets/img/gravity-bg.jpg?v=' . $__bgVer;
 ?><!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="#1e1b4b">
-    <title>Panel de Control — FarmaSystem</title>
+    <meta name="theme-color" content="#02386b">
+    <title>Panel de Control — Gravity</title>
+    <link rel="icon" type="image/svg+xml" href="../../assets/img/logos/favicon.svg">
+    <link rel="icon" type="image/png" href="../../assets/img/logos/favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -69,7 +74,9 @@ $prev_username = htmlspecialchars($_POST['username'] ?? '');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
-            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            background:
+                linear-gradient(135deg, rgba(3,3,8,.82) 0%, rgba(2,56,107,.6) 50%, rgba(3,3,8,.82) 100%),
+                url('<?= htmlspecialchars($__bgUrl) ?>') center center / cover no-repeat fixed;
             min-height: 100vh;
             display: flex; align-items: center; justify-content: center;
             padding: 24px 16px;
@@ -77,13 +84,13 @@ $prev_username = htmlspecialchars($_POST['username'] ?? '');
         .card {
             background: #fff;
             border-radius: 20px;
-            box-shadow: 0 25px 60px rgba(0,0,0,.5);
+            box-shadow: 0 25px 60px rgba(0,0,0,.6), 0 0 0 1px rgba(4,138,245,.15);
             width: 100%;
             max-width: 420px;
             overflow: hidden;
         }
         .card-header {
-            background: linear-gradient(135deg, #4f46e5, #3730a3);
+            background: linear-gradient(135deg, #048af5, #02386b);
             padding: 28px 32px 24px;
             text-align: center;
             color: #fff;
@@ -119,12 +126,12 @@ $prev_username = htmlspecialchars($_POST['username'] ?? '');
 
         .badge-admin {
             display: flex; align-items: center; gap: 10px;
-            background: #eef2ff; border: 1px solid #c7d2fe;
+            background: #e6efff; border: 1px solid #b8d2f5;
             border-radius: 10px; padding: 10px 14px; margin-bottom: 22px;
         }
-        .badge-admin i { color: #4f46e5; font-size: .9rem; }
-        .badge-admin-text .title { font-size: .85rem; font-weight: 700; color: #3730a3; }
-        .badge-admin-text .sub   { font-size: .72rem; color: #6366f1; margin-top: 1px; }
+        .badge-admin i { color: #0471cd; font-size: .9rem; }
+        .badge-admin-text .title { font-size: .85rem; font-weight: 700; color: #02386b; }
+        .badge-admin-text .sub   { font-size: .72rem; color: #0471cd; margin-top: 1px; }
 
         .form-group { margin-bottom: 16px; }
         .form-label {
@@ -143,7 +150,7 @@ $prev_username = htmlspecialchars($_POST['username'] ?? '');
             font-size: .93rem; font-family: inherit;
             outline: none; transition: border-color .15s; color: #1e293b;
         }
-        .form-input:focus { border-color: #4f46e5; }
+        .form-input:focus { border-color: #0471cd; }
         .form-input.with-toggle { padding-right: 42px; }
         .toggle-pass {
             position: absolute; right: 11px; top: 50%;
@@ -154,12 +161,13 @@ $prev_username = htmlspecialchars($_POST['username'] ?? '');
 
         .btn-submit {
             width: 100%; padding: 13px;
-            background: linear-gradient(135deg, #4f46e5, #3730a3);
+            background: linear-gradient(135deg, #048af5, #02386b);
             color: #fff; border: none; border-radius: 9px;
             font-size: .95rem; font-weight: 700;
             font-family: inherit; cursor: pointer;
             display: flex; align-items: center; justify-content: center; gap: 8px;
             transition: opacity .15s;
+            box-shadow: 0 4px 14px rgba(4,113,205,.35);
         }
         .btn-submit:hover { opacity: .9; }
 
@@ -176,7 +184,7 @@ $prev_username = htmlspecialchars($_POST['username'] ?? '');
     <div class="card-header">
         <div class="brand-icon"><i class="fas fa-shield-alt"></i></div>
         <div class="brand-name">Panel de Control</div>
-        <div class="brand-sub">FarmaSystem — Acceso restringido</div>
+        <div class="brand-sub">Gravity — Acceso restringido</div>
     </div>
 
     <div class="card-body">
@@ -228,7 +236,7 @@ $prev_username = htmlspecialchars($_POST['username'] ?? '');
 
     <div class="card-footer">
         <i class="fas fa-shield-alt"></i>
-        Acceso de sistema &mdash; FarmaSystem &copy; <?= date('Y') ?>
+        Acceso de sistema &mdash; Gravity &copy; <?= date('Y') ?>
     </div>
 
 </div>

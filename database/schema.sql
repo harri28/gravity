@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS productos (
     requiere_receta BOOLEAN DEFAULT FALSE,
     activo BOOLEAN DEFAULT TRUE,
     favorito BOOLEAN DEFAULT FALSE,
-    total_vendido INTEGER DEFAULT 0,
+    total_vendido DECIMAL(10,2) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

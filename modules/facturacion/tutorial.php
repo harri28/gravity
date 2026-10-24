@@ -10,7 +10,7 @@ $base_path      = '../../';
 $required_roles = ['admin', 'gerente'];
 $current_module = 'facturacion';
 $current_page   = 'facturacion';
-$page_title     = 'Manual SUNAT — FarmaSystem';
+$page_title     = 'Manual SUNAT — Gravity';
 $breadcrumb     = '<strong>Facturación</strong> / Manual SUNAT';
 
 include '../../includes/header.php';

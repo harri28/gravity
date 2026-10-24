@@ -4,7 +4,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## Project Overview
 
-**FarmaSystem** is a pharmacy Point of Sale (POS) web application built with PHP, vanilla JavaScript, and PostgreSQL. It runs on XAMPP (Apache + PHP).
+**Gravity** is a pharmacy Point of Sale (POS) web application built with PHP, vanilla JavaScript, and PostgreSQL. It runs on XAMPP (Apache + PHP).
 
 ## Running the Application
 

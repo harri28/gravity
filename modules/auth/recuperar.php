@@ -97,15 +97,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                   overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.08)">
       <tr>
         <td style="background:linear-gradient(135deg,#6366f1,#4f46e5);padding:28px 32px;text-align:center">
-          <p style="margin:0;font-size:1.3rem;font-weight:700;color:#fff">&#128138; FarmaSystem</p>
-          <p style="margin:6px 0 0;font-size:.82rem;color:rgba(255,255,255,.8)">Sistema de Gestión de Farmacia</p>
+          <p style="margin:0;font-size:1.3rem;font-weight:700;color:#fff">&#128138; Gravity</p>
+          <p style="margin:6px 0 0;font-size:.82rem;color:rgba(255,255,255,.8)">Punto de venta</p>
         </td>
       </tr>
       <tr>
         <td style="padding:32px">
           <p style="margin:0 0 14px;font-size:1rem;font-weight:700;color:#1e293b">Restablecer contraseña</p>
           <p style="margin:0 0 14px;font-size:.9rem;color:#475569;line-height:1.6">
-            Hola <strong>{$nombre}</strong>, recibimos una solicitud para restablecer la contraseña de tu cuenta en FarmaSystem.
+            Hola <strong>{$nombre}</strong>, recibimos una solicitud para restablecer la contraseña de tu cuenta en Gravity.
           </p>
           <p style="margin:0 0 24px;font-size:.9rem;color:#475569;line-height:1.6">
             Haz clic en el botón de abajo para crear una nueva contraseña.
@@ -134,7 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <tr>
         <td style="border-top:1px solid #e2e8f0;padding:14px 32px;text-align:center">
           <p style="margin:0;font-size:.73rem;color:#94a3b8">
-            FarmaSystem &copy; {$year} &nbsp;&middot;&nbsp; Correo automático, no responder
+            Gravity &copy; {$year} &nbsp;&middot;&nbsp; Correo automático, no responder
           </p>
         </td>
       </tr>
@@ -144,7 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </body>
 </html>
 HTML;
-                sendMail($user['email'], 'Restablecer contraseña — FarmaSystem', $html);
+                sendMail($user['email'], 'Restablecer contraseña — Gravity', $html);
             }
 
             // Respuesta genérica para no revelar si el usuario/email existe
@@ -164,7 +164,9 @@ $prev_input = htmlspecialchars($_POST['input'] ?? '');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Recuperar contraseña — FarmaSystem</title>
+    <title>Recuperar contraseña — Gravity</title>
+    <link rel="icon" type="image/svg+xml" href="../../assets/img/logos/favicon.svg">
+    <link rel="icon" type="image/png" href="../../assets/img/logos/favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -220,7 +222,7 @@ $prev_input = htmlspecialchars($_POST['input'] ?? '');
 <div class="card">
     <div class="card-header">
         <div class="brand-icon"><i class="fas fa-key"></i></div>
-        <div class="brand-name">FarmaSystem</div>
+        <div class="brand-name">Gravity</div>
         <div class="brand-sub">Recuperar contraseña</div>
     </div>
     <div class="card-body">
@@ -256,7 +258,7 @@ $prev_input = htmlspecialchars($_POST['input'] ?? '');
             <a href="login.php"><i class="fas fa-arrow-left"></i> Volver al inicio de sesión</a>
         </div>
     </div>
-    <div class="card-footer">FarmaSystem &copy; <?= date('Y') ?> · v1.0</div>
+    <div class="card-footer">Gravity &copy; <?= date('Y') ?> · v1.0</div>
 </div>
 </body>
 </html>

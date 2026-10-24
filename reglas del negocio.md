@@ -1,4 +1,4 @@
-# Reglas del Negocio — FarmaSystem
+# Reglas del Negocio — Gravity
 
 ## Multi-tenencia
 - Cada empresa (tenant) puede tener varias sucursales; cada sucursal tiene su propio schema de PostgreSQL (`sucursal_001`, `sucursal_002`, ...).

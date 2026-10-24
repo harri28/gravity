@@ -10,7 +10,7 @@ $base_path      = '../../';
 $required_roles = ['admin', 'gerente', 'cajero'];
 $current_module = 'inventario';
 $current_page   = 'inventario';
-$page_title     = 'Inventario — FarmaSystem';
+$page_title     = 'Inventario — Gravity';
 $breadcrumb     = '<strong>Inventario</strong> / Gestión de Productos';
 
 include '../../includes/header.php';

@@ -9,7 +9,7 @@ require_once '../../config/database.php';
 $base_path      = '../../';
 $current_module = 'caja';
 $current_page   = 'caja';
-$page_title     = 'Caja — FarmaSystem';
+$page_title     = 'Caja — Gravity';
 $breadcrumb     = '<strong>Caja</strong>';
 
 $db = getDB();

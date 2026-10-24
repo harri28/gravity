@@ -1,0 +1,899 @@
+<?php
+// ============================================================
+// ARCHIVO: modules/ventas/mesa.php
+// VISTA:   Mesa abierta -- comanda a la izquierda, catalogo a la derecha.
+//
+// Fase D del rebrand de Ventas. Punto de entrada:
+//   mesa.php?id=<mesa_id>    (si tiene comanda abierta, la carga; si no, redirige)
+//   mesa.php?comanda=<id>    (alternativa: cargar comanda por id directo)
+//
+// Reglas:
+//   - Agregar producto -> POST comanda_agregar_item -> descuenta stock
+//   - Quitar producto  -> POST comanda_quitar_item  -> repone stock
+//   - Cambiar cantidad -> POST comanda_cambiar_cantidad -> ajusta stock por delta
+//   - Barcode HID: evento 'barcodescan' -> busca por codigo_barras -> agrega 1
+//   - Boton COBRAR -> Fase E (por ahora toast "proxima fase")
+// ============================================================
+
+require_once '../../config/database.php';
+
+$mesaId    = intval($_GET['id']      ?? 0);
+$comandaId = intval($_GET['comanda'] ?? 0);
+
+// Resolver la comanda abierta ANTES de header: si no existe redirect
+// (evita renderizar la pagina y tener que mostrar un error feo).
+if ($mesaId || $comandaId) {
+    $db = getDB();
+    if ($comandaId) {
+        $ck = $db->prepare("SELECT id, mesa_id FROM comandas WHERE id = :c AND estado = 'abierta'");
+        $ck->execute([':c' => $comandaId]);
+    } else {
+        $ck = $db->prepare("SELECT id, mesa_id FROM comandas WHERE mesa_id = :m AND estado = 'abierta'");
+        $ck->execute([':m' => $mesaId]);
+    }
+    $resuelta = $ck->fetch();
+    if (!$resuelta) {
+        header('Location: index.php?msg=' . urlencode('La mesa no tiene una comanda abierta.'));
+        exit;
+    }
+    $resueltaMesaId    = (int) $resuelta['mesa_id'];
+    $resueltaComandaId = (int) $resuelta['id'];
+} else {
+    header('Location: index.php');
+    exit;
+}
+
+$base_path      = '../../';
+$current_module = 'ventas';
+$current_page   = 'mesas';
+$page_title     = 'Mesa — Gravity';
+$breadcrumb     = '<a href="index.php" style="color:var(--text-muted);text-decoration:none">Mesas</a> / <strong>Mesa</strong>';
+$required_roles = ['admin', 'gerente', 'cajero'];
+
+include '../../includes/header.php';
+?>
+
+<div class="page-header">
+    <div style="display:flex;align-items:center;gap:14px">
+        <a href="index.php" class="mesa-back-btn" title="Volver a Mesas">
+            <i class="fas fa-arrow-left"></i>
+        </a>
+        <div>
+            <div class="page-title" id="mesa-title">
+                <i class="fas fa-chair" style="color:var(--primary);margin-right:8px"></i>
+                Mesa <span id="mesa-num-txt">—</span>
+                <small id="mesa-nom-txt" style="color:var(--text-muted);font-weight:500;font-size:.75em"></small>
+            </div>
+            <div class="page-subtitle">
+                Abierta hace <strong id="mesa-crono" data-crono="">00:00:00</strong>
+                · <span id="mesa-mozo-txt"></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.mesa-back-btn {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:40px; height:40px; flex-shrink:0;
+    border-radius:50%;
+    background:var(--surface-2);
+    border:1px solid var(--border);
+    color:var(--text);
+    font-size:1rem;
+    text-decoration:none;
+    transition:background .15s, color .15s, transform .1s, border-color .15s;
+}
+.mesa-back-btn:hover {
+    background:var(--primary);
+    color:#fff;
+    border-color:var(--primary);
+    transform:translateX(-2px);
+}
+</style>
+
+<div class="mesa-layout">
+    <!-- ================================
+         IZQUIERDA: COMANDA
+         ================================ -->
+    <div class="mesa-comanda card">
+        <div class="card-header">
+            <div class="card-title">
+                <i class="fas fa-receipt" style="color:var(--primary);margin-right:6px"></i>Comanda
+            </div>
+            <span style="font-size:.75rem;color:var(--text-muted)" id="items-count-txt">0 items</span>
+        </div>
+
+        <div id="items-list" class="items-list">
+            <div class="items-empty"><i class="fas fa-utensils"></i><br>Agrega el primer pedido desde el catalogo</div>
+        </div>
+
+        <div class="comanda-footer">
+            <div class="comanda-total">
+                <span>Total</span>
+                <strong id="comanda-total">S/ 0.00</strong>
+            </div>
+            <button class="btn btn-primary btn-cobrar" id="btn-cobrar" onclick="cobrar()">
+                <i class="fas fa-cash-register"></i> COBRAR
+            </button>
+        </div>
+    </div>
+
+    <!-- ================================
+         DERECHA: CATALOGO
+         ================================ -->
+    <div class="mesa-catalogo card">
+        <div class="card-header">
+            <div class="card-title">
+                <i class="fas fa-list" style="color:var(--primary);margin-right:6px"></i>Catalogo
+            </div>
+            <span style="font-size:.72rem;color:var(--text-muted)">
+                <i class="fas fa-barcode"></i> Escaner HID activo
+            </span>
+        </div>
+
+        <div class="catalogo-filtros">
+            <input type="text" id="buscador" class="form-control" placeholder="Buscar producto por nombre o codigo..." autocomplete="off">
+            <div id="categorias-pills" class="categorias-pills">
+                <button class="cat-pill active" data-cat="0" onclick="filtrarCat(0, this)">Todos</button>
+            </div>
+        </div>
+
+        <div id="productos-grid" class="productos-grid">
+            <div class="items-empty" style="grid-column:1/-1">
+                <i class="fas fa-spinner fa-spin"></i> Cargando catalogo...
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================================
+     MODAL: Cobrar
+     ====================================================== -->
+<div class="modal-overlay" id="modal-cobrar">
+    <div class="modal" style="max-width:460px">
+        <div class="modal-header">
+            <h3 class="modal-title">Cobrar mesa <span id="cobro-mesa-num" style="color:var(--primary)"></span></h3>
+            <button class="modal-close" onclick="closeModal('modal-cobrar')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+
+            <div class="cobro-total-box">
+                <div>Total a cobrar</div>
+                <div class="cobro-total-num" id="cobro-total-num">S/ 0.00</div>
+                <div class="cobro-total-sub"><span id="cobro-items-count">0</span> items</div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Tipo de comprobante</label>
+                <div class="tipo-pills">
+                    <button type="button" class="tipo-pill active" data-tipo="ticket" onclick="setTipoComp('ticket', this)">
+                        <i class="fas fa-receipt"></i> Ticket
+                    </button>
+                    <button type="button" class="tipo-pill" data-tipo="boleta" onclick="setTipoComp('boleta', this)">
+                        <i class="fas fa-file-invoice"></i> Boleta
+                    </button>
+                    <button type="button" class="tipo-pill" data-tipo="factura" onclick="setTipoComp('factura', this)">
+                        <i class="fas fa-file-invoice-dollar"></i> Factura
+                    </button>
+                </div>
+                <small style="color:var(--text-muted);font-size:.72rem">
+                    Boleta/Factura se envian a SUNAT al confirmar.
+                </small>
+            </div>
+
+            <div class="form-group" id="row-cliente" style="display:none">
+                <label class="form-label">Cliente
+                    <small id="cliente-req-hint" style="color:var(--text-muted);font-weight:400"></small>
+                </label>
+                <div class="cliente-search-wrap">
+                    <input type="text" id="cliente-input" class="form-control" placeholder="Buscar por DNI, RUC o nombre..." autocomplete="off" oninput="buscarClienteDebounced()">
+                    <button type="button" class="btn btn-outline btn-sm" style="white-space:nowrap" onclick="usarClientesVarios()" title="Para boleta rapida sin DNI">
+                        <i class="fas fa-user"></i> Varios
+                    </button>
+                </div>
+                <div id="cliente-sugerencias" class="cliente-sugerencias"></div>
+                <div id="cliente-seleccionado" class="cliente-pill" style="display:none">
+                    <span id="cliente-sel-nombre"></span>
+                    <button type="button" onclick="limpiarCliente()" aria-label="Quitar"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Metodo de pago</label>
+                <select id="cobro-metodo" class="form-control" onchange="onMetodoChange()">
+                    <option value="efectivo">Efectivo</option>
+                    <option value="tarjeta">Tarjeta</option>
+                    <option value="transferencia">Transferencia</option>
+                    <option value="yape">Yape</option>
+                    <option value="plin">Plin</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="row-monto-recibido">
+                <label class="form-label">Monto recibido</label>
+                <input type="number" id="cobro-monto" class="form-control" step="0.01" min="0" placeholder="0.00" oninput="calcVuelto()">
+                <div class="cobro-vuelto-row">
+                    <span>Vuelto</span>
+                    <strong id="cobro-vuelto">S/ 0.00</strong>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Observaciones <small style="color:var(--text-muted)">(opcional)</small></label>
+                <textarea id="cobro-obs" class="form-control" rows="2" placeholder="Ej: cliente pidio factura por correo..."></textarea>
+            </div>
+
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('modal-cobrar')">Cancelar</button>
+            <button class="btn btn-primary" id="btn-confirmar-cobro" onclick="confirmarCobro()">
+                <i class="fas fa-check"></i> Confirmar cobro
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="app-toast-container" id="toast-container"></div>
+
+<style>
+/* Layout 2 columnas en desktop, stack en mobile */
+.mesa-layout {
+    display: grid;
+    grid-template-columns: minmax(320px, 420px) 1fr;
+    gap: 16px;
+    align-items: start;
+}
+@media (max-width: 820px) {
+    .mesa-layout { grid-template-columns: 1fr; }
+    .mesa-comanda { order: 2; }
+    .mesa-catalogo { order: 1; max-height: 60vh; }
+}
+
+/* Panel comanda */
+.mesa-comanda { display: flex; flex-direction: column; max-height: calc(100vh - 180px); position: sticky; top: 10px; }
+.items-list { padding: 8px 0; overflow-y: auto; flex: 1; min-height: 180px; }
+.items-empty { text-align: center; padding: 30px 20px; color: var(--text-muted); font-size: .9rem; }
+.items-empty i { font-size: 1.8rem; color: var(--border); margin-bottom: 8px; display: block; }
+
+.item-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-light);
+    animation: fadeIn .15s;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } }
+.item-row:last-child { border-bottom: none; }
+
+.item-nombre { font-weight: 600; color: var(--text); font-size: .9rem; }
+.item-meta   { font-size: .72rem; color: var(--text-muted); grid-column: 1 / -1; }
+.item-right  { display: flex; align-items: center; gap: 4px; }
+.item-cant {
+    display: inline-flex; align-items: center; gap: 2px;
+    background: var(--surface-2); border-radius: 6px; padding: 2px;
+}
+.item-cant button {
+    width: 24px; height: 24px; border: none; background: var(--surface);
+    color: var(--primary); border-radius: 4px; cursor: pointer; font-weight: 700;
+    transition: background .12s;
+}
+.item-cant button:hover { background: var(--primary-light); }
+.item-cant span { min-width: 24px; text-align: center; font-size: .85rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.item-subtotal { font-weight: 700; color: var(--text); font-size: .9rem; min-width: 70px; text-align: right; font-variant-numeric: tabular-nums; }
+.item-del {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-light); padding: 4px 6px; border-radius: 4px;
+    transition: color .12s, background .12s;
+}
+.item-del:hover { color: var(--danger); background: #fef2f2; }
+
+.comanda-footer {
+    border-top: 2px solid var(--border);
+    padding: 14px 18px;
+    background: var(--surface-2);
+    border-radius: 0 0 var(--radius) var(--radius);
+}
+.comanda-total {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 12px;
+    font-size: 1rem; color: var(--text-muted);
+}
+.comanda-total strong {
+    font-size: 1.6rem; color: var(--primary);
+    font-variant-numeric: tabular-nums;
+}
+.btn-cobrar {
+    width: 100%; font-size: 1.05rem; font-weight: 800;
+    padding: 14px;
+    background: linear-gradient(135deg, #048af5, #02386b);
+    box-shadow: 0 4px 14px rgba(4,113,205,.35);
+    letter-spacing: .04em;
+}
+.btn-cobrar:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+
+/* Panel catalogo */
+.mesa-catalogo { display: flex; flex-direction: column; max-height: calc(100vh - 180px); }
+.catalogo-filtros { padding: 10px 14px; border-bottom: 1px solid var(--border-light); display: flex; flex-direction: column; gap: 8px; }
+.categorias-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.cat-pill {
+    background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--text-muted); padding: 5px 12px; border-radius: 999px;
+    font-size: .76rem; font-weight: 600; cursor: pointer;
+    transition: .12s;
+}
+.cat-pill:hover { color: var(--primary); border-color: var(--primary); }
+.cat-pill.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+.productos-grid {
+    padding: 10px; overflow-y: auto; flex: 1;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px;
+}
+.producto-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column;
+    transition: .12s; min-height: 92px;
+    position: relative;
+}
+.producto-card:hover { border-color: var(--primary); background: var(--primary-light); transform: translateY(-1px); }
+.producto-card:active { transform: translateY(0); }
+.producto-card.sin-stock { opacity: .5; cursor: not-allowed; }
+.producto-card.sin-stock:hover { border-color: var(--border); background: var(--surface); transform: none; }
+.prod-nombre { font-weight: 600; color: var(--text); font-size: .82rem; line-height: 1.25; margin-bottom: 4px; }
+.prod-precio { font-weight: 800; color: var(--primary); font-size: .95rem; margin-top: auto; font-variant-numeric: tabular-nums; }
+.prod-stock  { font-size: .68rem; color: var(--text-muted); }
+.prod-stock.bajo { color: var(--warning); font-weight: 600; }
+.prod-service-badge {
+    position: absolute; top: 6px; right: 6px;
+    background: var(--info); color: #fff; font-size: .55rem; padding: 1px 5px;
+    border-radius: 3px; font-weight: 700; letter-spacing: .04em;
+}
+
+.app-toast {
+    background: var(--text); color: var(--surface); padding: 10px 16px;
+    border-radius: 8px; margin-bottom: 8px; font-size: .9rem;
+    display: flex; align-items: center; gap: 8px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.2);
+    animation: toastIn .15s;
+}
+.app-toast.success { background: var(--success); color: #fff; }
+.app-toast.error   { background: var(--danger); color: #fff; }
+@keyframes toastIn { from { transform: translateY(-10px); opacity: 0; } }
+
+/* Modal cobrar */
+.cobro-total-box {
+    background: linear-gradient(135deg, #048af5, #02386b);
+    color: #fff; padding: 18px 22px; border-radius: var(--radius);
+    margin-bottom: 18px; text-align: center;
+}
+.cobro-total-box > div:first-child { font-size: .78rem; opacity: .85; text-transform: uppercase; letter-spacing: .05em; }
+.cobro-total-num { font-size: 2rem; font-weight: 800; margin: 4px 0; font-variant-numeric: tabular-nums; }
+.cobro-total-sub { font-size: .78rem; opacity: .78; }
+
+.tipo-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.tipo-pill {
+    flex: 1; min-width: 90px;
+    background: var(--surface-2); color: var(--text-muted);
+    border: 2px solid var(--border); border-radius: 10px;
+    padding: 10px 8px; font-size: .82rem; font-weight: 600;
+    cursor: pointer; transition: .12s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.tipo-pill:hover { border-color: var(--primary); color: var(--primary); }
+.tipo-pill.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.tipo-pill.disabled { opacity: .4; cursor: not-allowed; pointer-events: none; }
+
+.cobro-vuelto-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-top: 8px; padding: 8px 14px;
+    background: var(--surface-2); border-radius: 8px;
+    font-size: .85rem; color: var(--text-muted);
+}
+.cobro-vuelto-row strong { color: var(--success); font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.cobro-vuelto-row.negativo strong { color: var(--danger); }
+
+/* Cliente widget (solo visible en boleta/factura) */
+.cliente-search-wrap { display: flex; gap: 6px; }
+.cliente-search-wrap input { flex: 1; }
+.cliente-sugerencias {
+    margin-top: 4px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    max-height: 180px; overflow-y: auto;
+}
+.cliente-sugerencias:empty { display: none; }
+.cliente-sugerencias .sugerencia {
+    padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--border-light);
+    font-size: .85rem; transition: background .1s;
+}
+.cliente-sugerencias .sugerencia:hover { background: var(--primary-light); color: var(--primary); }
+.cliente-sugerencias .sugerencia:last-child { border-bottom: none; }
+.cliente-sugerencias .sug-doc { font-size: .72rem; color: var(--text-muted); font-family: monospace; }
+.cliente-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 12px; background: var(--primary-light); color: var(--primary);
+    border-radius: 8px; margin-top: 6px; font-size: .88rem; font-weight: 600;
+}
+.cliente-pill button {
+    background: none; border: none; cursor: pointer;
+    color: var(--primary); padding: 2px; border-radius: 4px;
+    font-size: .75rem;
+}
+.cliente-pill button:hover { background: rgba(0,0,0,.08); }
+</style>
+
+<script>
+// ---------------------------------------------------------------
+// Estado
+// ---------------------------------------------------------------
+const MESA_ID    = <?= json_encode($resueltaMesaId) ?>;
+const COMANDA_ID = <?= json_encode($resueltaComandaId) ?>;
+const API = 'api.php';
+
+let COMANDA = null;
+let ITEMS = [];
+let PRODUCTOS = [];
+let CATEGORIA_FILTRO = 0;
+let TEXT_FILTRO = '';
+
+// ---------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------
+function escH(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function soles(n) { return 'S/ ' + parseFloat(n || 0).toFixed(2); }
+function parsePg(ts) { return ts ? new Date(String(ts).replace(' ', 'T')) : null; }
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function formatCrono(ms) {
+    const t = Math.max(0, Math.floor(ms / 1000));
+    const h = String(Math.floor(t / 3600)).padStart(2,'0');
+    const m = String(Math.floor((t % 3600) / 60)).padStart(2,'0');
+    const s = String(t % 60).padStart(2,'0');
+    return `${h}:${m}:${s}`;
+}
+function showToast(msg, type = 'info') {
+    const icons = { success:'check-circle', error:'exclamation-circle', info:'info-circle' };
+    const t = document.createElement('div');
+    t.className = `app-toast ${type}`;
+    t.innerHTML = `<i class="fas fa-${icons[type]||'info-circle'}"></i> ${escH(msg)}`;
+    const c = document.getElementById('toast-container');
+    if (c) { c.appendChild(t); setTimeout(() => t.remove(), 2800); }
+}
+
+async function postJson(url, body) {
+    const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {}),
+    });
+    try {
+        return await r.json();
+    } catch (error) {
+        throw new Error(`La API devolvio una respuesta no valida (HTTP ${r.status}).`);
+    }
+}
+
+// ---------------------------------------------------------------
+// Carga inicial y refresh
+// ---------------------------------------------------------------
+async function cargarComanda() {
+    try {
+        const d = await (await fetch(`${API}?action=comanda_detalle&id=${COMANDA_ID}`)).json();
+        if (d.error) {
+            showToast(d.message, 'error');
+            setTimeout(() => window.location = 'index.php', 1500);
+            return;
+        }
+        COMANDA = d.comanda;
+        ITEMS   = d.items || [];
+        renderHeader();
+        renderItems();
+    } catch (err) {
+        showToast('Error al cargar la comanda', 'error');
+    }
+}
+
+async function cargarProductos() {
+    try {
+        const data = await (await fetch(`${API}?action=productos`)).json();
+        if (!Array.isArray(data)) { showToast('Error cargando productos', 'error'); return; }
+        PRODUCTOS = data.filter(p => (p.product_type || 'product') === 'service' || parseFloat(p.stock) >= 0);
+        renderCategorias();
+        renderProductos();
+    } catch (err) {
+        showToast('Error de red cargando productos', 'error');
+    }
+}
+
+// ---------------------------------------------------------------
+// Render: cabecera
+// ---------------------------------------------------------------
+function renderHeader() {
+    if (!COMANDA) return;
+    document.getElementById('mesa-num-txt').textContent = '#' + COMANDA.mesa_numero;
+    document.getElementById('mesa-nom-txt').textContent = COMANDA.mesa_nombre ? ' — ' + COMANDA.mesa_nombre : '';
+    document.getElementById('mesa-mozo-txt').textContent = 'por ' + (COMANDA.usuario_apertura_nombre || '—');
+    document.getElementById('mesa-crono').dataset.crono = COMANDA.hora_apertura || '';
+    tickCrono();
+}
+function tickCrono() {
+    const el = document.getElementById('mesa-crono');
+    const start = parsePg(el.dataset.crono);
+    if (!start || isNaN(start)) return;
+    el.textContent = formatCrono(Date.now() - start.getTime());
+}
+
+// ---------------------------------------------------------------
+// Render: lista de items
+// ---------------------------------------------------------------
+function renderItems() {
+    const list = document.getElementById('items-list');
+    const totalItems = ITEMS.length;
+    document.getElementById('items-count-txt').textContent =
+        `${totalItems} ${totalItems === 1 ? 'item' : 'items'}`;
+
+    if (!totalItems) {
+        list.innerHTML = `<div class="items-empty"><i class="fas fa-utensils"></i><br>Agrega el primer pedido desde el catalogo</div>`;
+    } else {
+        list.innerHTML = ITEMS.map(renderItem).join('');
+    }
+
+    const total = ITEMS.reduce((s, it) => s + parseFloat(it.subtotal || 0), 0);
+    document.getElementById('comanda-total').textContent = soles(total);
+    document.getElementById('btn-cobrar').disabled = totalItems === 0;
+}
+
+function renderItem(it) {
+    const hora = parsePg(it.hora_pedido);
+    const horaTxt = hora ? hora.toLocaleTimeString('es-PE', {hour:'2-digit', minute:'2-digit'}) : '';
+    const cant = parseFloat(it.cantidad);
+    const cantTxt = Number.isInteger(cant) ? String(cant) : cant.toFixed(2);
+    return `
+        <div class="item-row">
+            <div>
+                <div class="item-nombre">${escH(it.producto_nombre)}</div>
+                <div class="item-meta">${horaTxt} · ${soles(it.precio_unitario)} c/u${it.mozo_nombre ? ' · ' + escH(it.mozo_nombre) : ''}</div>
+            </div>
+            <div class="item-right">
+                <div class="item-cant">
+                    <button onclick="cambiarCant(${it.id}, ${cant - 1})" ${cant <= 1 ? 'disabled' : ''}>-</button>
+                    <span>${cantTxt}</span>
+                    <button onclick="cambiarCant(${it.id}, ${cant + 1})">+</button>
+                </div>
+                <div class="item-subtotal">${soles(it.subtotal)}</div>
+                <button class="item-del" title="Quitar" onclick="quitarItem(${it.id})"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>`;
+}
+
+// ---------------------------------------------------------------
+// Render: catalogo (categorias + grid)
+// ---------------------------------------------------------------
+function renderCategorias() {
+    const seen = new Map();
+    PRODUCTOS.forEach(p => {
+        const id = parseInt(p.categoria_id || 0, 10);
+        if (!id) return;
+        if (!seen.has(id)) seen.set(id, p.categoria || `Cat ${id}`);
+    });
+    const pills = document.getElementById('categorias-pills');
+    const sorted = Array.from(seen.entries()).sort((a,b) => a[1].localeCompare(b[1]));
+    pills.innerHTML =
+        `<button class="cat-pill ${CATEGORIA_FILTRO === 0 ? 'active' : ''}" data-cat="0" onclick="filtrarCat(0, this)">Todos</button>` +
+        sorted.map(([id, nom]) =>
+            `<button class="cat-pill ${CATEGORIA_FILTRO === id ? 'active' : ''}" data-cat="${id}" onclick="filtrarCat(${id}, this)">${escH(nom)}</button>`
+        ).join('');
+}
+
+function filtrarCat(id, btnEl) {
+    CATEGORIA_FILTRO = id;
+    document.querySelectorAll('.cat-pill').forEach(b => b.classList.toggle('active', b === btnEl));
+    renderProductos();
+}
+
+function renderProductos() {
+    const grid = document.getElementById('productos-grid');
+    const texto = TEXT_FILTRO.trim().toLowerCase();
+    const filtrados = PRODUCTOS.filter(p => {
+        if (CATEGORIA_FILTRO && parseInt(p.categoria_id || 0, 10) !== CATEGORIA_FILTRO) return false;
+        if (!texto) return true;
+        return (p.nombre || '').toLowerCase().includes(texto)
+            || (p.codigo || '').toLowerCase().includes(texto)
+            || (p.codigo_barras || '').toLowerCase().includes(texto);
+    });
+    if (!filtrados.length) {
+        grid.innerHTML = `<div class="items-empty" style="grid-column:1/-1"><i class="fas fa-search"></i><br>Sin resultados</div>`;
+        return;
+    }
+    grid.innerHTML = filtrados.map(p => {
+        const esServ = (p.product_type || 'product') === 'service';
+        const stock  = parseFloat(p.stock || 0);
+        const sinStock = !esServ && stock <= 0;
+        const stockBajo = !esServ && stock > 0 && p.stock_minimo && stock <= parseFloat(p.stock_minimo);
+        const click = sinStock ? '' : `onclick="agregarProducto(${p.id})"`;
+        return `
+            <div class="producto-card ${sinStock ? 'sin-stock' : ''}" ${click}>
+                ${esServ ? '<span class="prod-service-badge">SERV</span>' : ''}
+                <div class="prod-nombre">${escH(p.nombre)}</div>
+                <div class="prod-precio">${soles(p.precio_venta)}</div>
+                ${esServ
+                    ? '<div class="prod-stock">servicio</div>'
+                    : `<div class="prod-stock ${stockBajo ? 'bajo' : ''}">Stock: ${stock}</div>`}
+            </div>`;
+    }).join('');
+}
+
+// ---------------------------------------------------------------
+// Acciones (agregar / quitar / cambiar cantidad)
+// ---------------------------------------------------------------
+let accionEnCurso = false;
+
+async function agregarProducto(productoId, cantidad = 1) {
+    if (accionEnCurso) return;
+    accionEnCurso = true;
+    const d = await postJson(`${API}?action=comanda_agregar_item`, {
+        comanda_id: COMANDA_ID,
+        producto_id: productoId,
+        cantidad: cantidad,
+    });
+    accionEnCurso = false;
+    if (d.error) { showToast(d.message, 'error'); return; }
+    showToast(d.message, 'success');
+    await Promise.all([cargarComanda(), cargarProductos()]);
+}
+
+async function quitarItem(itemId) {
+    if (accionEnCurso) return;
+    if (!confirm('¿Quitar este item de la comanda? El stock sera repuesto.')) return;
+    accionEnCurso = true;
+    const d = await postJson(`${API}?action=comanda_quitar_item`, { item_id: itemId });
+    accionEnCurso = false;
+    if (d.error) { showToast(d.message, 'error'); return; }
+    showToast(d.message, 'success');
+    await Promise.all([cargarComanda(), cargarProductos()]);
+}
+
+async function cambiarCant(itemId, nuevaCant) {
+    if (accionEnCurso || nuevaCant < 1) return;
+    accionEnCurso = true;
+    const d = await postJson(`${API}?action=comanda_cambiar_cantidad`, {
+        item_id: itemId, cantidad: nuevaCant,
+    });
+    accionEnCurso = false;
+    if (d.error) { showToast(d.message, 'error'); return; }
+    await Promise.all([cargarComanda(), cargarProductos()]);
+}
+
+// ---------------------------------------------------------------
+// Cobro (Fase E/E.1)
+// ---------------------------------------------------------------
+let TIPO_COMP_SELECT = 'ticket';
+let CLIENTE_SELECT = null;      // {id, nombre, documento, tipo_doc}
+let _clienteBuscarTimer = null;
+
+function cobrar() {
+    if (!ITEMS.length) {
+        showToast('No hay items para cobrar', 'error');
+        return;
+    }
+    const total = ITEMS.reduce((s, it) => s + parseFloat(it.subtotal || 0), 0);
+    document.getElementById('cobro-mesa-num').textContent = '#' + (COMANDA?.mesa_numero || '');
+    document.getElementById('cobro-total-num').textContent = soles(total);
+    document.getElementById('cobro-items-count').textContent = ITEMS.length;
+    document.getElementById('cobro-metodo').value = 'efectivo';
+    document.getElementById('cobro-monto').value = '';
+    document.getElementById('cobro-obs').value = '';
+    document.getElementById('btn-confirmar-cobro').disabled = false;
+    document.getElementById('btn-confirmar-cobro').innerHTML = '<i class="fas fa-check"></i> Confirmar cobro';
+    TIPO_COMP_SELECT = 'ticket';
+    CLIENTE_SELECT = null;
+    document.querySelectorAll('.tipo-pill').forEach(b => b.classList.toggle('active', b.dataset.tipo === 'ticket'));
+    limpiarCliente();
+    document.getElementById('cliente-input').value = '';
+    onTipoChange();
+    onMetodoChange();
+    calcVuelto();
+    openModal('modal-cobrar');
+    setTimeout(() => document.getElementById('cobro-monto').focus(), 80);
+}
+
+function setTipoComp(tipo, btnEl) {
+    TIPO_COMP_SELECT = tipo;
+    document.querySelectorAll('.tipo-pill').forEach(b => b.classList.toggle('active', b === btnEl));
+    onTipoChange();
+}
+
+function onTipoChange() {
+    const rowCliente = document.getElementById('row-cliente');
+    const hint       = document.getElementById('cliente-req-hint');
+    if (TIPO_COMP_SELECT === 'ticket') {
+        rowCliente.style.display = 'none';
+    } else {
+        rowCliente.style.display = '';
+        hint.textContent = TIPO_COMP_SELECT === 'factura'
+            ? '— requerido (debe tener RUC)'
+            : '— opcional (si no eliges, va a Clientes Varios)';
+    }
+}
+
+// ---------------- Cliente search ----------------
+function buscarClienteDebounced() {
+    clearTimeout(_clienteBuscarTimer);
+    const q = document.getElementById('cliente-input').value.trim();
+    const box = document.getElementById('cliente-sugerencias');
+    if (q.length < 2) { box.innerHTML = ''; return; }
+    _clienteBuscarTimer = setTimeout(() => buscarCliente(q), 250);
+}
+
+async function buscarCliente(q) {
+    try {
+        const r = await fetch(`${API}?action=buscar_cliente&q=${encodeURIComponent(q)}`);
+        const d = await r.json();
+        const box = document.getElementById('cliente-sugerencias');
+        if (!d || d.error) { box.innerHTML = ''; return; }
+        // El endpoint devuelve un solo cliente (match exacto o similar).
+        // Lo mostramos como una sola sugerencia.
+        const row = Array.isArray(d) ? d[0] : d;
+        if (!row) {
+            box.innerHTML = `<div class="sugerencia" style="color:var(--text-muted);cursor:default">
+                Sin resultados para "${escH(q)}"
+            </div>`;
+            return;
+        }
+        const nombre = row.razon_social || row.nombre_completo || `${row.nombres || ''} ${row.apellidos || ''}`.trim();
+        const doc    = row.numero_documento || row.ruc || row.dni || '';
+        box.innerHTML = `<div class="sugerencia" onclick='seleccionarCliente(${JSON.stringify({id: row.id, nombre, doc, ruc: row.ruc})})'>
+            <strong>${escH(nombre)}</strong><br>
+            <span class="sug-doc">${escH(doc)}</span>
+        </div>`;
+    } catch (err) {
+        showToast('Error buscando cliente', 'error');
+    }
+}
+
+function seleccionarCliente(c) {
+    CLIENTE_SELECT = c;
+    document.getElementById('cliente-sel-nombre').textContent = `${c.nombre} · ${c.doc}`;
+    document.getElementById('cliente-seleccionado').style.display = '';
+    document.getElementById('cliente-input').value = '';
+    document.getElementById('cliente-sugerencias').innerHTML = '';
+}
+
+function limpiarCliente() {
+    CLIENTE_SELECT = null;
+    document.getElementById('cliente-seleccionado').style.display = 'none';
+    document.getElementById('cliente-sel-nombre').textContent = '';
+    document.getElementById('cliente-sugerencias').innerHTML = '';
+}
+
+function usarClientesVarios() {
+    // El backend buscara automaticamente el cliente "Clientes Varios"
+    // (numero_documento '00000000'). Para el UI mostramos un placeholder.
+    seleccionarCliente({ id: null, nombre: 'Clientes Varios', doc: '00000000' });
+}
+
+function onMetodoChange() {
+    const metodo = document.getElementById('cobro-metodo').value;
+    // Vuelto solo tiene sentido para efectivo. Para los otros, el monto recibido
+    // es siempre = total (no hay vuelto), asi que lo escondemos para no confundir.
+    document.getElementById('row-monto-recibido').style.display = metodo === 'efectivo' ? '' : 'none';
+    calcVuelto();
+}
+
+function calcVuelto() {
+    const total  = ITEMS.reduce((s, it) => s + parseFloat(it.subtotal || 0), 0);
+    const metodo = document.getElementById('cobro-metodo').value;
+    const monto  = parseFloat(document.getElementById('cobro-monto').value || 0);
+    const row    = document.querySelector('.cobro-vuelto-row');
+    if (metodo !== 'efectivo') { if (row) row.classList.remove('negativo'); return; }
+    const vuelto = monto - total;
+    document.getElementById('cobro-vuelto').textContent = soles(Math.max(0, vuelto));
+    if (row) row.classList.toggle('negativo', vuelto < 0);
+}
+
+async function confirmarCobro() {
+    const metodo = document.getElementById('cobro-metodo').value;
+    const monto  = parseFloat(document.getElementById('cobro-monto').value || 0);
+    const obs    = document.getElementById('cobro-obs').value.trim();
+    const total  = ITEMS.reduce((s, it) => s + parseFloat(it.subtotal || 0), 0);
+
+    // Validaciones por tipo de comprobante
+    if (TIPO_COMP_SELECT === 'factura') {
+        if (!CLIENTE_SELECT || !CLIENTE_SELECT.id) {
+            showToast('Para factura necesitas seleccionar un cliente con RUC', 'error');
+            return;
+        }
+        if (!CLIENTE_SELECT.ruc) {
+            showToast('El cliente seleccionado no tiene RUC. Edita el cliente o elige otro.', 'error');
+            return;
+        }
+    }
+
+    if (metodo === 'efectivo' && monto < total) {
+        if (!confirm(`El monto recibido (${soles(monto)}) es menor al total (${soles(total)}). ¿Confirmar igual?`)) return;
+    }
+
+    const btn = document.getElementById('btn-confirmar-cobro');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cobrando...';
+
+    let d;
+    try {
+        d = await postJson(`${API}?action=cobrar_comanda`, {
+            comanda_id: COMANDA_ID,
+            tipo_comprobante: TIPO_COMP_SELECT,
+            tipo_pago: metodo,
+            monto_recibido: metodo === 'efectivo' ? monto : total,
+            observaciones: obs,
+            cliente_id: (CLIENTE_SELECT && CLIENTE_SELECT.id) ? CLIENTE_SELECT.id : null,
+        });
+    } catch (error) {
+        showToast(`No se pudo completar el cobro: ${error.message}`, 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check"></i> Confirmar cobro';
+        return;
+    }
+
+    if (d.error) {
+        showToast(d.message, 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check"></i> Confirmar cobro';
+        if (d.caja_cerrada) {
+            setTimeout(() => { window.location = '../caja/index.php'; }, 2000);
+        }
+        return;
+    }
+
+    // Mensaje de exito: incluye numero completo (B001-00001234) si es SUNAT,
+    // o numero_venta (V20261022-NNNN) si es ticket. Incluye estado SUNAT si aplica.
+    const idRef = d.numero_completo || d.numero_venta;
+    const sunatSuffix = d.sunat_estado
+        ? ` · SUNAT ${d.sunat_ok ? 'Aceptado' : d.sunat_estado}`
+        : '';
+    const vueltoSuffix = (d.vuelto > 0) ? ` · Vuelto ${soles(d.vuelto)}` : '';
+    const msg = `Mesa #${d.mesa_numero} cobrada · ${idRef}${sunatSuffix}${vueltoSuffix}`;
+    sessionStorage.setItem('cobro_ok', msg);
+    window.location = 'index.php';
+}
+
+// ---------------------------------------------------------------
+// Barcode HID (evento global disparado por assets/js/barcode-scanner.js)
+// ---------------------------------------------------------------
+document.addEventListener('barcodescan', (e) => {
+    const code = (e.detail && e.detail.code || '').trim();
+    if (!code) return;
+    const prod = PRODUCTOS.find(p =>
+        (p.codigo_barras || '').trim() === code ||
+        (p.codigo || '').trim() === code ||
+        (p.codigo_interno || '').trim() === code
+    );
+    if (!prod) { showToast(`Codigo no encontrado: ${code}`, 'error'); return; }
+    if ((prod.product_type || 'product') !== 'service' && parseFloat(prod.stock) <= 0) {
+        showToast(`Sin stock de ${prod.nombre}`, 'error'); return;
+    }
+    agregarProducto(prod.id);
+});
+
+// Buscador: filtro al tipear
+document.getElementById('buscador').addEventListener('input', (e) => {
+    TEXT_FILTRO = e.target.value;
+    renderProductos();
+});
+
+// ---------------------------------------------------------------
+// Arranque
+// ---------------------------------------------------------------
+cargarComanda();
+cargarProductos();
+setInterval(tickCrono, 1000);
+
+// Refresh del header de comanda cada minuto (si otro mozo agrega
+// items desde otro navegador, se refleja aca). No es realtime pero
+// sirve como safety net sin inflar el server.
+setInterval(cargarComanda, 60000);
+</script>
+
+<?php include '../../includes/footer.php'; ?>

@@ -18,22 +18,52 @@ $tenant = $tenant->fetch();
 if (!$tenant) { header('Location: index.php'); exit; }
 
 $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
+$_sa_tema_oscuro = getSuperadminTemaOscuro();
 ?><!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="<?= $_sa_tema_oscuro ? 'dark' : 'light' ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#4f46e5">
-    <title><?= htmlspecialchars($tenant['nombre']) ?> — FarmaSystem</title>
+    <title><?= htmlspecialchars($tenant['nombre']) ?> — Gravity</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; color: #1e293b; min-height: 100vh; }
+
+        :root {
+            --sa-bg: #f1f5f9;
+            --sa-surface: #fff;
+            --sa-surface-2: #f8fafc;
+            --sa-border: #e2e8f0;
+            --sa-text: #1e293b;
+            --sa-text-secondary: #475569;
+            --sa-text-muted: #64748b;
+            --sa-text-light: #94a3b8;
+        }
+        :root[data-theme="dark"] {
+            --sa-bg: #0B1220;
+            --sa-surface: #111827;
+            --sa-surface-2: #1A2333;
+            --sa-border: #2A3547;
+            --sa-text: #E5E7EB;
+            --sa-text-secondary: #CBD5E1;
+            --sa-text-muted: #94A3B8;
+            --sa-text-light: #64748B;
+        }
+        @media print {
+            :root, :root[data-theme="dark"] {
+                --sa-bg: #fff; --sa-surface: #fff; --sa-surface-2: #f8fafc;
+                --sa-border: #e2e8f0; --sa-text: #1e293b;
+                --sa-text-secondary: #475569; --sa-text-muted: #64748b; --sa-text-light: #94a3b8;
+            }
+        }
+
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--sa-bg); color: var(--sa-text); min-height: 100vh; }
 
         /* Topbar */
         .topbar {
-            background: #fff; border-bottom: 1px solid #e2e8f0;
+            background: var(--sa-surface); border-bottom: 1px solid var(--sa-border);
             padding: 0 28px; height: 60px;
             display: flex; align-items: center; justify-content: space-between;
             position: sticky; top: 0; z-index: 100;
@@ -42,18 +72,18 @@ $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
         .topbar-left { display: flex; align-items: center; gap: 14px; }
         .back-btn {
             display: flex; align-items: center; gap: 7px;
-            background: #f1f5f9; border: 1px solid #e2e8f0;
-            color: #475569; padding: 7px 14px; border-radius: 8px;
+            background: var(--sa-bg); border: 1px solid var(--sa-border);
+            color: var(--sa-text-secondary); padding: 7px 14px; border-radius: 8px;
             text-decoration: none; font-size: .82rem; font-weight: 600;
             transition: background .15s;
         }
-        .back-btn:hover { background: #e2e8f0; }
-        .topbar-brand { font-weight: 700; font-size: .95rem; color: #1e293b; }
+        .back-btn:hover { background: var(--sa-border); }
+        .topbar-brand { font-weight: 700; font-size: .95rem; color: var(--sa-text); }
         .topbar-brand span { color: #6366f1; }
         .btn-logout {
             display: flex; align-items: center; gap: 6px;
-            background: #f1f5f9; color: #475569;
-            border: 1px solid #e2e8f0; padding: 7px 14px;
+            background: var(--sa-bg); color: var(--sa-text-secondary);
+            border: 1px solid var(--sa-border); padding: 7px 14px;
             border-radius: 8px; cursor: pointer; font-size: .82rem;
             text-decoration: none; transition: background .15s, color .15s;
         }
@@ -64,7 +94,7 @@ $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
 
         /* Hero header */
         .hero {
-            background: #fff; border: 1px solid #e2e8f0;
+            background: var(--sa-surface); border: 1px solid var(--sa-border);
             border-radius: 14px; padding: 24px 28px;
             display: flex; align-items: center; gap: 20px;
             margin-bottom: 28px; box-shadow: 0 1px 3px rgba(0,0,0,.04);
@@ -75,7 +105,7 @@ $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
             justify-content: center; font-size: 1.4rem; color: #6366f1; flex-shrink: 0;
         }
         .hero-info { flex: 1; }
-        .hero-nombre { font-size: 1.3rem; font-weight: 700; color: #1e293b; }
+        .hero-nombre { font-size: 1.3rem; font-weight: 700; color: var(--sa-text); }
         .hero-meta { display: flex; align-items: center; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
         .badge {
             display: inline-block; padding: 3px 10px;
@@ -83,7 +113,7 @@ $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
         }
         .badge-activo     { background: #dcfce7; color: #16a34a; }
         .badge-inactivo   { background: #fee2e2; color: #dc2626; }
-        .badge-basico     { background: #e2e8f0; color: #475569; }
+        .badge-basico     { background: var(--sa-border); color: var(--sa-text-secondary); }
         .badge-pro        { background: #fef3c7; color: #b45309; }
         .badge-enterprise { background: #ede9fe; color: #6d28d9; }
         .badge-vence-ok   { background: var(--sa-border); color: var(--sa-text-secondary); }
@@ -92,7 +122,7 @@ $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
         .btn-pagado { background: #16a34a; color: #fff; border: none; border-radius: 8px; padding: 9px 16px; font-size: .86rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
         .btn-pagado:hover { opacity: .88; }
         .pago-hint { font-size: .74rem; color: var(--sa-text-light); margin-top: 5px; }
-        .hero-slug { font-size: .8rem; color: #94a3b8; font-family: monospace; }
+        .hero-slug { font-size: .8rem; color: var(--sa-text-light); font-family: monospace; }
         .hero-actions { display: flex; gap: 10px; }
 
         /* Stats row */
@@ -102,7 +132,7 @@ $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
         }
         @media (max-width: 640px) { .stats-row { grid-template-columns: 1fr; } }
         .stat-card {
-            background: #fff; border: 1px solid #e2e8f0;
+            background: var(--sa-surface); border: 1px solid var(--sa-border);
             border-radius: 12px; padding: 18px 20px;
             display: flex; align-items: center; gap: 14px;
             box-shadow: 0 1px 3px rgba(0,0,0,.04);
@@ -111,24 +141,24 @@ $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
         .stat-icon.blue   { background: #dbeafe; color: #2563eb; }
         .stat-icon.green  { background: #dcfce7; color: #16a34a; }
         .stat-icon.indigo { background: #eef2ff; color: #6366f1; }
-        .stat-value { font-size: 1.6rem; font-weight: 700; color: #1e293b; line-height: 1; }
-        .stat-label { font-size: .78rem; color: #64748b; margin-top: 3px; }
+        .stat-value { font-size: 1.6rem; font-weight: 700; color: var(--sa-text); line-height: 1; }
+        .stat-label { font-size: .78rem; color: var(--sa-text-muted); margin-top: 3px; }
 
         /* Sections */
         .sections { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         @media (max-width: 900px) { .sections { grid-template-columns: 1fr; } }
 
         .section-card {
-            background: #fff; border: 1px solid #e2e8f0;
+            background: var(--sa-surface); border: 1px solid var(--sa-border);
             border-radius: 14px; overflow: hidden;
             box-shadow: 0 1px 3px rgba(0,0,0,.04);
         }
         .section-head {
-            padding: 16px 20px; border-bottom: 1px solid #f1f5f9;
+            padding: 16px 20px; border-bottom: 1px solid var(--sa-bg);
             display: flex; align-items: center; justify-content: space-between;
         }
         .section-head-title {
-            font-size: .95rem; font-weight: 700; color: #1e293b;
+            font-size: .95rem; font-weight: 700; color: var(--sa-text);
             display: flex; align-items: center; gap: 8px;
         }
         .section-head-title i { color: #6366f1; }
@@ -137,17 +167,17 @@ $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
         #listaSucursales, #listaUsuarios { overflow-x: auto; }
         .sec-table { width: 100%; border-collapse: collapse; }
         .sec-table thead th {
-            background: #f8fafc; padding: 9px 16px;
+            background: var(--sa-surface-2); padding: 9px 16px;
             font-size: .72rem; font-weight: 700;
-            text-transform: uppercase; color: #64748b; text-align: left;
+            text-transform: uppercase; color: var(--sa-text-muted); text-align: left;
         }
-        .sec-table tbody tr { border-top: 1px solid #f1f5f9; transition: background .1s; }
+        .sec-table tbody tr { border-top: 1px solid var(--sa-bg); transition: background .1s; }
         .sec-table tbody tr:hover { background: #fafafe; }
-        .sec-table td { padding: 11px 16px; font-size: .86rem; color: #475569; vertical-align: middle; }
-        .td-name { font-weight: 600; color: #1e293b; }
+        .sec-table td { padding: 11px 16px; font-size: .86rem; color: var(--sa-text-secondary); vertical-align: middle; }
+        .td-name { font-weight: 600; color: var(--sa-text); }
 
         /* Empty state */
-        .empty { padding: 40px 20px; text-align: center; color: #94a3b8; font-size: .85rem; }
+        .empty { padding: 40px 20px; text-align: center; color: var(--sa-text-light); font-size: .85rem; }
         .empty i { font-size: 2rem; display: block; margin-bottom: 10px; }
 
         /* Buttons */
@@ -171,55 +201,55 @@ $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
         .btn-toggle.off   { background: #fee2e2; color: #dc2626; }
         .btn-toggle.off:hover { background: #dc2626; color: #fff; }
         .btn-cancel {
-            background: #f1f5f9; color: #475569;
-            border: 1px solid #e2e8f0; padding: 8px 14px;
+            background: var(--sa-bg); color: var(--sa-text-secondary);
+            border: 1px solid var(--sa-border); padding: 8px 14px;
             border-radius: 8px; cursor: pointer; font-size: .82rem; font-weight: 600;
         }
-        .btn-cancel:hover { background: #e2e8f0; }
+        .btn-cancel:hover { background: var(--sa-border); }
 
         /* Inline form panel */
         .form-panel {
-            display: none; border-top: 1px solid #e2e8f0;
-            padding: 18px 20px; background: #f8fafc;
+            display: none; border-top: 1px solid var(--sa-border);
+            padding: 18px 20px; background: var(--sa-surface-2);
         }
         .form-panel.open { display: block; }
-        .form-panel-title { font-size: .85rem; font-weight: 700; color: #1e293b; margin-bottom: 14px; }
+        .form-panel-title { font-size: .85rem; font-weight: 700; color: var(--sa-text); margin-bottom: 14px; }
         .form-row { display: grid; gap: 12px; margin-bottom: 12px; }
         .form-row.cols2 { grid-template-columns: 1fr 1fr; }
         .form-row.cols3 { grid-template-columns: 1fr 1fr 1fr; }
         .form-group label {
             display: block; font-size: .72rem; font-weight: 600;
-            color: #64748b; text-transform: uppercase; margin-bottom: 5px;
+            color: var(--sa-text-muted); text-transform: uppercase; margin-bottom: 5px;
         }
         .form-group input, .form-group select {
             width: 100%; padding: 9px 11px;
-            background: #fff; border: 1.5px solid #e2e8f0;
-            border-radius: 8px; font-size: .88rem; color: #1e293b;
+            background: var(--sa-surface); border: 1.5px solid var(--sa-border);
+            border-radius: 8px; font-size: .88rem; color: var(--sa-text);
             outline: none; transition: border-color .15s;
         }
         .form-group input:focus, .form-group select:focus { border-color: #6366f1; }
         .sunat-readonly {
             width: 100%; padding: 9px 11px;
-            background: #f8fafc; border: 1.5px solid #e2e8f0;
-            border-radius: 8px; font-size: .88rem; color: #1e293b;
+            background: var(--sa-surface-2); border: 1.5px solid var(--sa-border);
+            border-radius: 8px; font-size: .88rem; color: var(--sa-text);
             font-family: monospace; min-height: 20px;
         }
-        .sunat-readonly.empty { color: #94a3b8; font-family: inherit; font-style: italic; }
+        .sunat-readonly.empty { color: var(--sa-text-light); font-family: inherit; font-style: italic; }
         .form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
 
         /* Inline edit row */
-        .edit-row { display: none; background: #f8fafc; }
+        .edit-row { display: none; background: var(--sa-surface-2); }
         .edit-row td { padding: 10px 14px; }
 
         /* Loading */
-        .loading { padding: 32px; text-align: center; color: #94a3b8; }
+        .loading { padding: 32px; text-align: center; color: var(--sa-text-light); }
 
         /* Toast */
         #toast {
             position: fixed; bottom: 24px; right: 24px;
-            background: #fff; border: 1px solid #e2e8f0;
+            background: var(--sa-surface); border: 1px solid var(--sa-border);
             border-radius: 10px; padding: 12px 18px;
-            font-size: .85rem; color: #1e293b;
+            font-size: .85rem; color: var(--sa-text);
             display: flex; align-items: center; gap: 10px;
             box-shadow: 0 8px 24px rgba(0,0,0,.1);
             z-index: 9999; opacity: 0; transform: translateY(8px);
@@ -240,21 +270,37 @@ $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
         .modal-overlay.active { display: flex; }
         .modal {
             display: block;
-            background: #fff; border: 1px solid #e2e8f0;
+            background: var(--sa-surface); border: 1px solid var(--sa-border);
             border-radius: 16px; width: 100%; max-width: 440px;
             box-shadow: 0 20px 50px rgba(0,0,0,.15);
             animation: modalIn .18s ease;
         }
         @keyframes modalIn { from{opacity:0;transform:translateY(-12px) scale(.97)} to{opacity:1;transform:none} }
         .modal-header {
-            padding: 18px 22px 14px; border-bottom: 1px solid #e2e8f0;
+            padding: 18px 22px 14px; border-bottom: 1px solid var(--sa-border);
             display: flex; align-items: center; justify-content: space-between;
         }
-        .modal-title { font-size: .95rem; font-weight: 700; color: #1e293b; }
-        .modal-close { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1rem; border-radius: 6px; padding: 3px; }
-        .modal-close:hover { color: #1e293b; }
+        .modal-title { font-size: .95rem; font-weight: 700; color: var(--sa-text); }
+        .modal-close { background: none; border: none; color: var(--sa-text-light); cursor: pointer; font-size: 1rem; border-radius: 6px; padding: 3px; }
+        .modal-close:hover { color: var(--sa-text); }
         .modal-body { padding: 18px 22px; }
-        .modal-footer { padding: 14px 22px; border-top: 1px solid #e2e8f0; display: flex; gap: 8px; justify-content: flex-end; }
+        .modal-footer { padding: 14px 22px; border-top: 1px solid var(--sa-border); display: flex; gap: 8px; justify-content: flex-end; }
+
+        /* ---- Switch modo oscuro (estilo iOS) ---- */
+        .ios-switch { position: relative; display: inline-block; width: 44px; height: 26px; flex-shrink: 0; }
+        .ios-switch input { opacity: 0; width: 0; height: 0; }
+        .ios-switch-slider {
+            position: absolute; inset: 0; cursor: pointer;
+            background-color: var(--sa-border); border-radius: 34px; transition: .25s;
+        }
+        .ios-switch-slider::before {
+            position: absolute; content: ""; height: 22px; width: 22px; left: 2px; top: 2px;
+            background-color: #fff; border-radius: 50%; transition: .25s;
+            box-shadow: 0 2px 4px rgba(0,0,0,.25);
+        }
+        .ios-switch input:checked + .ios-switch-slider { background-color: #34C759; }
+        .ios-switch input:checked + .ios-switch-slider::before { transform: translateX(18px); }
+        .ios-switch input:disabled + .ios-switch-slider { opacity: .6; cursor: default; }
 
         /* ---- Mobile (celular, Android/iOS) ---- */
         @media (max-width: 640px) {
@@ -277,9 +323,15 @@ $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
 <div class="topbar">
     <div class="topbar-left">
         <a href="index.php" class="back-btn"><i class="fas fa-arrow-left"></i> Panel</a>
-        <div class="topbar-brand">FarmaSystem <span>/ <?= htmlspecialchars($tenant['nombre']) ?></span></div>
+        <div class="topbar-brand">Gravity <span>/ <?= htmlspecialchars($tenant['nombre']) ?></span></div>
     </div>
-    <a href="../auth/logout.php" class="btn-logout"><i class="fas fa-sign-out-alt"></i> Salir</a>
+    <div style="display:flex;align-items:center;gap:14px">
+        <label class="ios-switch" title="Modo oscuro">
+            <input type="checkbox" id="tema-switch" onchange="aplicarTema(this.checked)" <?= $_sa_tema_oscuro ? 'checked' : '' ?>>
+            <span class="ios-switch-slider"></span>
+        </label>
+        <a href="../auth/logout.php" class="btn-logout"><i class="fas fa-sign-out-alt"></i> Salir</a>
+    </div>
 </div>
 
 <!-- Main -->
@@ -305,9 +357,13 @@ $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
                     <?= $planes[$tenant['plan']] ?? $tenant['plan'] ?>
                 </span>
                 <span class="hero-slug"><i class="fas fa-tag" style="margin-right:4px"></i><?= htmlspecialchars($tenant['slug']) ?></span>
+                <span class="badge" id="heroVence" data-fecha="<?= htmlspecialchars($tenant['plan_vence_at'] ?? '') ?>"></span>
             </div>
         </div>
         <div class="hero-actions">
+            <button class="btn-pagado" onclick="abrirPagado()">
+                <i class="fas fa-check-circle"></i> Marcar como pagado
+            </button>
             <button class="btn-primary" onclick="abrirEditEmpresa()">
                 <i class="fas fa-pen"></i> Editar empresa
             </button>
@@ -357,13 +413,9 @@ $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
                 <button class="btn-primary" onclick="toggleForm('formSucursal')">
                     <i class="fas fa-plus"></i> Nueva
                 </button>
-                <span class="badge" id="heroVence" data-fecha="<?= htmlspecialchars($tenant['plan_vence_at'] ?? '') ?>"></span>
             </div>
 
             <!-- Form nueva sucursal -->
-            <button class="btn-pagado" onclick="abrirPagado()">
-                <i class="fas fa-check-circle"></i> Marcar como pagado
-            </button>
             <div class="form-panel" id="formSucursal">
                 <div class="form-panel-title"><i class="fas fa-plus-circle" style="color:#6366f1;margin-right:6px"></i>Nueva sucursal</div>
                 <div class="form-row cols2">
@@ -411,8 +463,8 @@ $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
                             <input type="password" id="uPassword" placeholder="Mín. 4 caracteres" style="padding-right:40px;width:100%">
                             <button type="button" id="uPassToggle" onclick="togglePassVisibility()"
                                 title="Mostrar/ocultar contraseña"
-                                style="position:absolute;right:0;top:0;height:100%;width:38px;background:none;border:none;cursor:pointer;color:#94a3b8;font-size:.95rem;display:flex;align-items:center;justify-content:center;border-radius:0 8px 8px 0;transition:color .15s"
-                                onmouseenter="this.style.color='#6366f1'" onmouseleave="this.style.color='#94a3b8'">
+                                style="position:absolute;right:0;top:0;height:100%;width:38px;background:none;border:none;cursor:pointer;color:var(--sa-text-light);font-size:.95rem;display:flex;align-items:center;justify-content:center;border-radius:0 8px 8px 0;transition:color .15s"
+                                onmouseenter="this.style.color='#6366f1'" onmouseleave="this.style.color='var(--sa-text-light)'">
                                 <i class="fas fa-eye" id="uPassEyeIcon"></i>
                             </button>
                         </div>
@@ -439,8 +491,8 @@ $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
                     <div class="form-group">
                         <label>Observaciones</label>
                         <textarea id="uObservaciones" placeholder="Notas sobre el usuario..." rows="2"
-                            style="width:100%;padding:9px 11px;background:#fff;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.88rem;color:#1e293b;outline:none;resize:vertical;font-family:inherit;transition:border-color .15s"
-                            onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'"></textarea>
+                            style="width:100%;padding:9px 11px;background:var(--sa-surface);border:1.5px solid var(--sa-border);border-radius:8px;font-size:.88rem;color:var(--sa-text);outline:none;resize:vertical;font-family:inherit;transition:border-color .15s"
+                            onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='var(--sa-border)'"></textarea>
                     </div>
                 </div>
                 <div class="form-actions">
@@ -450,6 +502,16 @@ $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
             </div>
 
             <div id="listaUsuarios"><div class="loading"><i class="fas fa-spinner fa-spin"></i></div></div>
+        </div>
+
+        <!-- PAGOS DEL PLAN -->
+        <div class="section-card" style="grid-column:1/-1">
+            <div class="section-head">
+                <div class="section-head-title">
+                    <i class="fas fa-receipt"></i> Pagos del plan
+                </div>
+            </div>
+            <div id="listaPagos" style="overflow-x:auto"><div class="loading"><i class="fas fa-spinner fa-spin"></i></div></div>
         </div>
 
     </div>
@@ -467,21 +529,21 @@ $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
                 <div class="form-group">
                     <label>Logo</label>
                     <div style="display:flex;align-items:center;gap:14px">
-                        <div style="width:60px;height:60px;border-radius:10px;border:1px dashed #cbd5e1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#f8fafc;flex-shrink:0">
+                        <div style="width:60px;height:60px;border-radius:10px;border:1px dashed var(--sa-text-light);display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--sa-surface-2);flex-shrink:0">
                             <?php if (!empty($tenant['logo'])): ?>
                                 <img id="eLogoPreviewImg" src="../../<?= htmlspecialchars($tenant['logo']) ?>" alt="logo" style="width:100%;height:100%;object-fit:contain">
-                                <i id="eLogoIcon" class="fas fa-image" style="color:#cbd5e1;font-size:1.3rem;display:none"></i>
+                                <i id="eLogoIcon" class="fas fa-image" style="color:var(--sa-text-light);font-size:1.3rem;display:none"></i>
                             <?php else: ?>
                                 <img id="eLogoPreviewImg" src="" alt="logo" style="display:none;width:100%;height:100%;object-fit:contain">
-                                <i id="eLogoIcon" class="fas fa-image" style="color:#cbd5e1;font-size:1.3rem"></i>
+                                <i id="eLogoIcon" class="fas fa-image" style="color:var(--sa-text-light);font-size:1.3rem"></i>
                             <?php endif; ?>
                         </div>
                         <div style="flex:1">
-                            <label for="eLogoFile" style="display:inline-flex;align-items:center;gap:7px;cursor:pointer;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;padding:7px 13px;font-size:.8rem;font-weight:600;color:#475569">
+                            <label for="eLogoFile" style="display:inline-flex;align-items:center;gap:7px;cursor:pointer;background:var(--sa-bg);border:1px solid var(--sa-border);border-radius:8px;padding:7px 13px;font-size:.8rem;font-weight:600;color:var(--sa-text-secondary)">
                                 <i class="fas fa-upload"></i> Elegir imagen
                             </label>
                             <input type="file" id="eLogoFile" accept="image/*" style="display:none" onchange="ePreviewLogo(this)">
-                            <p id="eLogoFileName" style="font-size:.74rem;color:#94a3b8;margin-top:5px">JPG, PNG, WEBP — máx. 2 MB</p>
+                            <p id="eLogoFileName" style="font-size:.74rem;color:var(--sa-text-light);margin-top:5px">JPG, PNG, WEBP — máx. 2 MB</p>
                         </div>
                     </div>
                 </div>
@@ -489,7 +551,7 @@ $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
             <div class="form-row">
                 <div class="form-group"><label>Nombre *</label><input type="text" id="eNombre" value="<?= htmlspecialchars($tenant['nombre']) ?>"></div>
             </div>
-            <div class="form-row">
+            <div class="form-row cols2">
                 <div class="form-group">
                     <label>Plan</label>
                     <select id="ePlan">
@@ -504,16 +566,6 @@ $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
                     <p style="font-size:.74rem;color:var(--sa-text-light);margin-top:5px">
                         Opcional. Si el aviso está activado, el cliente lo ve en su panel cuando falten 7 días o menos.
                     </p>
-        <!-- PAGOS DEL PLAN -->
-        <div class="section-card" style="grid-column:1/-1">
-            <div class="section-head">
-                <div class="section-head-title">
-                    <i class="fas fa-receipt"></i> Pagos del plan
-                </div>
-            </div>
-            <div id="listaPagos" style="overflow-x:auto"><div class="loading"><i class="fas fa-spinner fa-spin"></i></div></div>
-        </div>
-
                 </div>
                 <div class="form-group" style="grid-column:1/-1">
                     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:.88rem;font-weight:500;width:auto">
@@ -533,58 +585,6 @@ $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
     </div>
 </div>
 
-<!-- Modal Datos SUNAT (solo lectura) + Notas internas de superadmin -->
-<div class="modal-overlay" id="modalSunatInfoOverlay">
-    <div class="modal">
-        <div class="modal-header">
-            <span class="modal-title"><i class="fas fa-key" style="color:#4f46e5;margin-right:8px"></i>Datos SUNAT</span>
-            <button class="modal-close" onclick="cerrarSunatInfo()"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="modal-body">
-            <p style="font-size:.78rem;color:#94a3b8;margin-bottom:16px">
-                Editable desde acá por el superadmin. El Admin de la empresa también puede cambiar estos datos desde su propio panel (Configuración) — el que se guarde último es el que queda.
-            </p>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>RUC</label>
-                    <input type="text" id="sInfoRuc" placeholder="Sin configurar">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Usuario SOL</label>
-                    <input type="text" id="sInfoUsuario" placeholder="Sin configurar">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Clave SOL</label>
-                    <input type="text" id="sInfoClave" placeholder="Sin configurar">
-                </div>
-            </div>
-            <div class="form-row" style="margin-top:6px">
-                <div class="form-group">
-                    <label>Notas <span style="text-transform:none;font-weight:400;color:#94a3b8">(solo visibles para superadmin)</span></label>
-                    <textarea id="sInfoNotas" rows="10" style="width:100%;padding:9px 11px;background:#fff;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.88rem;color:#1e293b;outline:none;resize:vertical;font-family:inherit"></textarea>
-                </div>
-            </div>
-        </div>
-        <div class="modal-footer">
-            <button class="btn-cancel" onclick="cerrarSunatInfo()">Cerrar</button>
-            <button class="btn-primary" onclick="guardarSunatInfo()"><i class="fas fa-save"></i> Guardar</button>
-        </div>
-    </div>
-</div>
-
-<!-- Modal upgrade de plan -->
-<div class="modal-overlay" id="modalUpgradeOverlay">
-    <div class="modal" style="max-width:420px">
-        <div class="modal-header" style="background:linear-gradient(135deg,#6366f1,#4f46e5);border-radius:16px 16px 0 0">
-            <span class="modal-title" style="color:#fff"><i class="fas fa-arrow-circle-up" style="margin-right:8px"></i>Límite de plan alcanzado</span>
-            <button class="modal-close" style="color:rgba(255,255,255,.7)" onclick="cerrarUpgrade()"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="modal-body" style="text-align:center;padding:28px 24px 16px">
-            <div style="width:64px;height:64px;background:#eef2ff;border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:1.8rem">🏪</div>
 <!-- Modal marcar como pagado -->
 <div class="modal-overlay" id="modalPagadoOverlay">
     <div class="modal">
@@ -616,7 +616,59 @@ $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
     </div>
 </div>
 
-            <p id="upgradeMsg" style="font-size:.93rem;color:#475569;line-height:1.6;margin-bottom:18px"></p>
+<!-- Modal Datos SUNAT (solo lectura) + Notas internas de superadmin -->
+<div class="modal-overlay" id="modalSunatInfoOverlay">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title"><i class="fas fa-key" style="color:#4f46e5;margin-right:8px"></i>Datos SUNAT</span>
+            <button class="modal-close" onclick="cerrarSunatInfo()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size:.78rem;color:var(--sa-text-light);margin-bottom:16px">
+                Editable desde acá por el superadmin. El Admin de la empresa también puede cambiar estos datos desde su propio panel (Configuración) — el que se guarde último es el que queda.
+            </p>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>RUC</label>
+                    <input type="text" id="sInfoRuc" placeholder="Sin configurar">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Usuario SOL</label>
+                    <input type="text" id="sInfoUsuario" placeholder="Sin configurar">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Clave SOL</label>
+                    <input type="text" id="sInfoClave" placeholder="Sin configurar">
+                </div>
+            </div>
+            <div class="form-row" style="margin-top:6px">
+                <div class="form-group">
+                    <label>Notas <span style="text-transform:none;font-weight:400;color:var(--sa-text-light)">(solo visibles para superadmin)</span></label>
+                    <textarea id="sInfoNotas" rows="10" style="width:100%;padding:9px 11px;background:var(--sa-surface);border:1.5px solid var(--sa-border);border-radius:8px;font-size:.88rem;color:var(--sa-text);outline:none;resize:vertical;font-family:inherit"></textarea>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" onclick="cerrarSunatInfo()">Cerrar</button>
+            <button class="btn-primary" onclick="guardarSunatInfo()"><i class="fas fa-save"></i> Guardar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal upgrade de plan -->
+<div class="modal-overlay" id="modalUpgradeOverlay">
+    <div class="modal" style="max-width:420px">
+        <div class="modal-header" style="background:linear-gradient(135deg,#6366f1,#4f46e5);border-radius:16px 16px 0 0">
+            <span class="modal-title" style="color:#fff"><i class="fas fa-arrow-circle-up" style="margin-right:8px"></i>Límite de plan alcanzado</span>
+            <button class="modal-close" style="color:rgba(255,255,255,.7)" onclick="cerrarUpgrade()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body" style="text-align:center;padding:28px 24px 16px">
+            <div style="width:64px;height:64px;background:#eef2ff;border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:1.8rem">🏪</div>
+            <p id="upgradeMsg" style="font-size:.93rem;color:var(--sa-text-secondary);line-height:1.6;margin-bottom:18px"></p>
             <div id="upgradePlanes" style="display:flex;gap:12px;justify-content:center;margin-bottom:6px"></div>
         </div>
         <div class="modal-footer" style="justify-content:center;gap:10px">
@@ -636,7 +688,7 @@ $planes = ['basico' => 'Básico', 'pro' => 'Pro', 'enterprise' => 'Enterprise'];
             <button class="modal-close" onclick="cerrarConfirm()"><i class="fas fa-times"></i></button>
         </div>
         <div class="modal-body">
-            <p id="confirmMsg" style="font-size:.9rem;color:#475569;line-height:1.6;white-space:pre-line"></p>
+            <p id="confirmMsg" style="font-size:.9rem;color:var(--sa-text-secondary);line-height:1.6;white-space:pre-line"></p>
         </div>
         <div class="modal-footer">
             <button class="btn-cancel" onclick="cerrarConfirm()">Cancelar</button>
@@ -660,6 +712,29 @@ function toast(msg, tipo = 'ok') {
     clearTimeout(el._t);
     el._t = setTimeout(() => el.className = el.className.replace('show','').trim(), 3500);
 }
+
+// ---- Modo oscuro (preferencia personal del superadmin) ----
+async function aplicarTema(temaOscuro) {
+    const sw = document.getElementById('tema-switch');
+    sw.disabled = true;
+    try {
+        const r = await fetch(`${API}?action=tema_guardar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tema_oscuro: temaOscuro }),
+        });
+        const d = await r.json();
+        if (d.error) { toast(d.message, 'err'); sw.checked = !temaOscuro; return; }
+        document.documentElement.setAttribute('data-theme', temaOscuro ? 'dark' : 'light');
+        toast(temaOscuro ? 'Modo oscuro activado' : 'Modo claro activado');
+    } catch {
+        toast('Error de conexión', 'err');
+        sw.checked = !temaOscuro;
+    } finally {
+        sw.disabled = false;
+    }
+}
+
 function esc(s) {
     return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/\r?\n/g,' ');
 }
@@ -719,12 +794,12 @@ async function cargarSucursales() {
             <tr id="srow-${s.id}" style="${s.archivada ? 'opacity:.55' : ''}">
                 <td class="td-name">
                     ${esc(s.nombre)}
-                    ${s.archivada ? '<span style="margin-left:6px;padding:1px 7px;border-radius:20px;font-size:.65rem;font-weight:700;text-transform:uppercase;background:#f1f5f9;color:#94a3b8">Archivada</span>' : ''}
+                    ${s.archivada ? '<span style="margin-left:6px;padding:1px 7px;border-radius:20px;font-size:.65rem;font-weight:700;text-transform:uppercase;background:var(--sa-bg);color:var(--sa-text-light)">Archivada</span>' : ''}
                 </td>
-                <td style="color:#64748b;font-size:.82rem">${esc(s.direccion||'—')}</td>
+                <td style="color:var(--sa-text-muted);font-size:.82rem">${esc(s.direccion||'—')}</td>
                 <td style="text-align:center">${s.total_usuarios}</td>
                 <td>${s.archivada
-                    ? '<span style="padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:700;text-transform:uppercase;background:#f1f5f9;color:#94a3b8">Archivada</span>'
+                    ? '<span style="padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:700;text-transform:uppercase;background:var(--sa-bg);color:var(--sa-text-light)">Archivada</span>'
                     : `<span style="padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:700;text-transform:uppercase;background:${s.activo?'#dcfce7':'#fee2e2'};color:${s.activo?'#16a34a':'#dc2626'}">${s.activo?'Activa':'Inactiva'}</span>`
                 }</td>
                 <td style="text-align:right">
@@ -884,15 +959,15 @@ async function cargarUsuarios() {
                 const sucText = primera
                     ? `<div style="display:flex;align-items:center;gap:6px">
                            <i class="fas fa-store" style="color:#6366f1;font-size:.75rem"></i>
-                           <span style="font-weight:600;color:#1e293b;font-size:.85rem">${esc(primera.sucursal)}</span>
-                           ${acc.length > 1 ? `<span style="font-size:.72rem;color:#94a3b8">+${acc.length-1}</span>` : ''}
+                           <span style="font-weight:600;color:var(--sa-text);font-size:.85rem">${esc(primera.sucursal)}</span>
+                           ${acc.length > 1 ? `<span style="font-size:.72rem;color:var(--sa-text-light)">+${acc.length-1}</span>` : ''}
                        </div>`
-                    : '<span style="color:#94a3b8;font-size:.78rem">—</span>';
+                    : '<span style="color:var(--sa-text-light);font-size:.78rem">—</span>';
                 const rolColors = { admin: ['#eef2ff','#4f46e5'], cajero: ['#f0fdf4','#16a34a'] };
-                const [rBg, rColor] = rolColors[primera?.rol] ?? ['#f1f5f9','#64748b'];
+                const [rBg, rColor] = rolColors[primera?.rol] ?? ['var(--sa-bg)','var(--sa-text-muted)'];
                 const rolText = primera
                     ? `<span style="padding:2px 9px;border-radius:20px;font-size:.72rem;font-weight:700;text-transform:uppercase;background:${rBg};color:${rColor}">${primera.rol}</span>`
-                    : '<span style="color:#94a3b8;font-size:.78rem">—</span>';
+                    : '<span style="color:var(--sa-text-light);font-size:.78rem">—</span>';
                 return `
                 <tr id="urow-${u.id}">
                     <td class="td-name">${esc(u.nombre)} ${esc(u.apellido||'')}</td>
@@ -1099,7 +1174,8 @@ async function guardarEmpresa() {
     toast(d.message);
     cerrarModal();
     document.querySelector('.hero-nombre').textContent = nombre;
-    document.title = nombre + ' — FarmaSystem';
+    pintarVence(plan_vence_at);
+    document.title = nombre + ' — Gravity';
 }
 
 // ---- Cerrar modal al click fuera ----
@@ -1158,7 +1234,7 @@ function actualizarStats(suc, usr) {
 
 // ---- Modal upgrade de plan ----
 const PLAN_LABELS = { basico: 'Básico', pro: 'Pro', enterprise: 'Enterprise' };
-const PLAN_COLORS = { basico: '#64748b', pro: '#b45309', enterprise: '#6d28d9' };
+const PLAN_COLORS = { basico: 'var(--sa-text-muted)', pro: '#b45309', enterprise: '#6d28d9' };
 const PLAN_ICONS  = { basico: '📦', pro: '⭐', enterprise: '🚀' };
 let _upgradePlanSiguiente = null;
 
@@ -1172,17 +1248,16 @@ function mostrarUpgrade(data) {
          Para agregar más sucursales necesitas cambiar al plan <strong>${labelSiguiente}</strong>.`;
 
     document.getElementById('upgradePlanes').innerHTML = `
-        <div style="flex:1;border:2px solid #e2e8f0;border-radius:12px;padding:14px 10px;text-align:center;opacity:.6">
+        <div style="flex:1;border:2px solid var(--sa-border);border-radius:12px;padding:14px 10px;text-align:center;opacity:.6">
             <div style="font-size:1.4rem">${PLAN_ICONS[data.plan_actual]||'📦'}</div>
-    pintarVence(plan_vence_at);
-            <div style="font-weight:700;font-size:.85rem;color:${PLAN_COLORS[data.plan_actual]||'#64748b'};margin-top:4px">${labelActual}</div>
-            <div style="font-size:.72rem;color:#94a3b8;margin-top:2px">Máx. ${data.limite} sucursal(es)</div>
+            <div style="font-weight:700;font-size:.85rem;color:${PLAN_COLORS[data.plan_actual]||'var(--sa-text-muted)'};margin-top:4px">${labelActual}</div>
+            <div style="font-size:.72rem;color:var(--sa-text-light);margin-top:2px">Máx. ${data.limite} sucursal(es)</div>
         </div>
-        <div style="display:flex;align-items:center;color:#94a3b8;font-size:1.1rem">→</div>
+        <div style="display:flex;align-items:center;color:var(--sa-text-light);font-size:1.1rem">→</div>
         <div style="flex:1;border:2px solid #6366f1;border-radius:12px;padding:14px 10px;text-align:center;background:#fafafe">
             <div style="font-size:1.4rem">${PLAN_ICONS[data.plan_siguiente]||'🚀'}</div>
             <div style="font-weight:700;font-size:.85rem;color:${PLAN_COLORS[data.plan_siguiente]||'#6d28d9'};margin-top:4px">${labelSiguiente}</div>
-            <div style="font-size:.72rem;color:#94a3b8;margin-top:2px">Sucursales ilimitadas</div>
+            <div style="font-size:.72rem;color:var(--sa-text-light);margin-top:2px">Sucursales ilimitadas</div>
         </div>`;
 
     document.getElementById('btnUpgradeLabel').textContent = `Cambiar a ${labelSiguiente}`;
@@ -1221,13 +1296,6 @@ document.getElementById('modalUpgradeOverlay').addEventListener('click', e => {
     if (e.target.id === 'modalUpgradeOverlay') cerrarUpgrade();
 });
 
-// ---- Init ----
-cargarSucursales();
-cargarUsuarios();
-</script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
 // ---- Pagos del plan / vencimiento ----
 const fmtFechaLocal = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 const fmtFechaVista = iso => iso ? iso.split('-').reverse().join('/') : '—';
@@ -1306,5 +1374,12 @@ document.getElementById('modalPagadoOverlay').addEventListener('click', e => {
     if (e.target.id === 'modalPagadoOverlay') cerrarPagado();
 });
 
+// ---- Init ----
 pintarVence(document.getElementById('heroVence').dataset.fecha);
 cargarPagos();
+cargarSucursales();
+cargarUsuarios();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -36,12 +36,18 @@ if ($host === 'admin.genpharma.cloud') {
 if (!$subdomain_mode && count($host_parts) >= 3 && $host_parts[0] !== 'www') {
     require __DIR__ . '/../../includes/error_tenant.php';
 }
+
+$__bgPath = __DIR__ . '/../../assets/img/gravity-bg.jpg';
+$__bgVer = @filemtime($__bgPath) ?: 0;
+$__bgUrl = (function_exists('app_public_prefix') ? app_public_prefix() : '/gravity') . '/assets/img/gravity-bg.jpg?v=' . $__bgVer;
 ?><!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Iniciar sesión — FarmaSystem</title>
+    <title>Iniciar sesión — Gravity</title>
+    <link rel="icon" type="image/svg+xml" href="../../assets/img/logos/favicon.svg">
+    <link rel="icon" type="image/png" href="../../assets/img/logos/favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -49,7 +55,9 @@ if (!$subdomain_mode && count($host_parts) >= 3 && $host_parts[0] !== 'www') {
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
-            background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%);
+            background:
+                linear-gradient(135deg, rgba(3,3,8,.78) 0%, rgba(2,56,107,.55) 50%, rgba(3,3,8,.78) 100%),
+                url('<?= htmlspecialchars($__bgUrl) ?>') center center / cover no-repeat fixed;
             min-height: 100vh;
             display: flex; align-items: center; justify-content: center;
             padding: 24px 16px;
@@ -57,7 +65,7 @@ if (!$subdomain_mode && count($host_parts) >= 3 && $host_parts[0] !== 'www') {
         .card {
             background: #fff;
             border-radius: 20px;
-            box-shadow: 0 25px 60px rgba(0,0,0,.4);
+            box-shadow: 0 25px 60px rgba(0,0,0,.55), 0 0 0 1px rgba(4,138,245,.1);
             width: 100%;
             max-width: 480px;
             overflow: hidden;
@@ -65,7 +73,7 @@ if (!$subdomain_mode && count($host_parts) >= 3 && $host_parts[0] !== 'www') {
         }
         .card.wide { max-width: 680px; }
         .card-header {
-            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            background: linear-gradient(135deg, #048af5, #02386b);
             padding: 26px 32px 22px;
             text-align: center;
             color: #fff;
@@ -90,8 +98,8 @@ if (!$subdomain_mode && count($host_parts) >= 3 && $host_parts[0] !== 'www') {
             border:2px solid #e2e8f0;border-radius:11px;padding:14px 12px;cursor:pointer;
             transition:border-color .15s,background .15s,transform .1s;
         }
-        .sel-card:hover { border-color:#6366f1;background:#fafafe;transform:translateY(-1px); }
-        .sel-card.selected { border-color:#6366f1;background:#eef2ff; }
+        .sel-card:hover { border-color:#0471cd;background:#f4f9ff;transform:translateY(-1px); }
+        .sel-card.selected { border-color:#0471cd;background:#e6efff; }
         .sel-icon { width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:.95rem;margin-bottom:9px; }
         .sel-icon.branch  { background:#f0fdf4;color:#16a34a; }
         .sel-nombre  { font-size:.88rem;font-weight:700;color:#1e293b; }
@@ -105,11 +113,11 @@ if (!$subdomain_mode && count($host_parts) >= 3 && $host_parts[0] !== 'www') {
         .input-wrap { position:relative; }
         .input-icon { position:absolute;left:13px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.88rem; }
         .form-input { width:100%;padding:11px 14px 11px 37px;border:2px solid #e2e8f0;border-radius:9px;font-size:.93rem;font-family:inherit;outline:none;transition:border-color .15s;color:#1e293b; }
-        .form-input:focus { border-color:#6366f1; }
+        .form-input:focus { border-color:#0471cd; }
         .form-input.with-toggle { padding-right:42px; }
         .toggle-pass { position:absolute;right:11px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#94a3b8; }
         .toggle-pass:hover { color:#475569; }
-        .btn-submit { width:100%;padding:13px;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;border:none;border-radius:9px;font-size:1rem;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .15s; }
+        .btn-submit { width:100%;padding:13px;background:linear-gradient(135deg,#048af5,#02386b);color:#fff;border:none;border-radius:9px;font-size:1rem;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .15s;box-shadow:0 4px 14px rgba(4,113,205,.35); }
         .btn-submit:hover { opacity:.92; }
         .btn-submit:disabled { opacity:.6;cursor:default; }
 
@@ -125,9 +133,9 @@ if (!$subdomain_mode && count($host_parts) >= 3 && $host_parts[0] !== 'www') {
 <div class="card" id="login-card">
 
     <div class="card-header">
-        <div class="brand-icon"><i class="fas fa-pills"></i></div>
-        <div class="brand-name">FarmaSystem</div>
-        <div class="brand-sub">Sistema de Gestión de Farmacia</div>
+        <div class="brand-icon"><i class="fas fa-rocket"></i></div>
+        <div class="brand-name">Gravity</div>
+        <div class="brand-sub">Punto de venta</div>
     </div>
 
     <div class="card-body">
@@ -172,7 +180,7 @@ if (!$subdomain_mode && count($host_parts) >= 3 && $host_parts[0] !== 'www') {
                     <i class="fas fa-arrow-right"></i> Continuar
                 </button>
                 <div style="text-align:center;margin-top:14px">
-                    <a href="recuperar.php" style="font-size:.78rem;color:#6366f1;text-decoration:none;display:inline-flex;align-items:center;gap:5px">
+                    <a href="recuperar.php" style="font-size:.78rem;color:#0471cd;text-decoration:none;display:inline-flex;align-items:center;gap:5px">
                         <i class="fas fa-key" style="font-size:.7rem"></i> ¿Olvidaste tu contraseña?
                     </a>
                 </div>
@@ -197,7 +205,7 @@ if (!$subdomain_mode && count($host_parts) >= 3 && $host_parts[0] !== 'www') {
 
     </div>
 
-    <div class="card-footer">FarmaSystem &copy; <?= date('Y') ?> · v1.0</div>
+    <div class="card-footer">Gravity &copy; <?= date('Y') ?> · v1.0</div>
 </div>
 
 <script>

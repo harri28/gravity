@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**FarmaSystem** is a multi-tenant pharmacy Point of Sale (POS) web application built with PHP, vanilla JavaScript, and PostgreSQL. It runs on XAMPP (Apache + PHP). It integrates with Peru's SUNAT electronic invoicing system (direct SOAP and via Nubefact API).
+**Gravity** is a multi-tenant pharmacy Point of Sale (POS) web application built with PHP, vanilla JavaScript, and PostgreSQL. It runs on XAMPP (Apache + PHP). It integrates with Peru's SUNAT electronic invoicing system (direct SOAP and via Nubefact API).
 
 ## Running the Application
 
@@ -40,7 +40,7 @@ Root `index.php` routes by hostname (production has vanity subdomains per tenant
 - `admin.genpharma.cloud` → `modules/superadmin/login.php`.
 - 3+ labels, not `www`, first label matches an **active** `public.tenants.slug` → `modules/auth/login.php`.
 - 3+ labels, not `www`, no matching tenant → `includes/error_tenant.php` (standalone "Empresa no encontrada", HTTP 404, no redirect — doesn't hint that a superadmin panel exists).
-- Anything else (bare domain, `www`, localhost/dev) → `includes/landing.php` (public marketing page, brand "FarmaSystem", links to `modules/auth/login.php`).
+- Anything else (bare domain, `www`, localhost/dev) → `includes/landing.php` (public marketing page, brand "Gravity", links to `modules/auth/login.php`).
 
 **Important**: the subdomain is purely cosmetic for login purposes — it does **not** restrict which tenant's users can log in there. `modules/auth/login.php` always resolves the tenant from the authenticated user's own `usuarios.tenant_id` (via `modules/auth/api.php`), regardless of which subdomain (or the bare domain) was used to reach it. The only URL-driven rule is that a subdomain matching *no* active tenant slug shows the 404 error page instead of a login form.
 

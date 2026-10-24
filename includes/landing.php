@@ -1,9 +1,15 @@
-<!DOCTYPE html>
+<?php
+$__bgPath = __DIR__ . '/../assets/img/gravity-bg.jpg';
+$__bgVer = @filemtime($__bgPath) ?: 0;
+$__bgUrl = (function_exists('app_public_prefix') ? app_public_prefix() : '/gravity') . '/assets/img/gravity-bg.jpg?v=' . $__bgVer;
+?><!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FarmaSystem — Sistema para farmacias</title>
+    <title>Gravity — Sistema para farmacias</title>
+    <link rel="icon" type="image/svg+xml" href="assets/img/logos/favicon.svg">
+    <link rel="icon" type="image/png" href="assets/img/logos/favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -15,35 +21,44 @@
             background: #f8fafc;
         }
 
-        /* ---- Hero ---- */
+        /* ---- Hero (fondo Gravity: pozo gravitatorio azul sobre negro) ---- */
         .hero {
-            background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%);
+            position: relative;
+            background:
+                linear-gradient(135deg, rgba(3,3,8,.84) 0%, rgba(2,24,48,.74) 50%, rgba(3,3,8,.86) 100%),
+                url('<?= htmlspecialchars($__bgUrl) ?>') center center / cover no-repeat;
             color: #fff;
-            padding: 64px 24px 96px;
+            padding: 96px 24px 128px;
             text-align: center;
+            overflow: hidden;
         }
         .hero-icon {
             width: 64px; height: 64px; margin: 0 auto 18px;
-            background: rgba(255,255,255,.14);
+            background: rgba(4,138,245,.15);
+            border: 1px solid rgba(4,138,245,.35);
             border-radius: 16px;
             display: flex; align-items: center; justify-content: center;
             font-size: 1.8rem;
+            color: #9ec8ff;
+            backdrop-filter: blur(6px);
         }
-        .hero h1 { font-size: 2.2rem; font-weight: 800; margin-bottom: 10px; }
-        .hero p { font-size: 1.02rem; color: rgba(255,255,255,.75); max-width: 480px; margin: 0 auto 28px; line-height: 1.5; }
+        .hero h1 { font-size: 2.6rem; font-weight: 800; margin-bottom: 10px; letter-spacing: -.02em; text-shadow: 0 2px 12px rgba(0,0,0,.55); }
+        .hero p { font-size: 1.02rem; color: rgba(255,255,255,.94); max-width: 520px; margin: 0 auto 28px; line-height: 1.55; text-shadow: 0 1px 8px rgba(0,0,0,.75); }
         .btn-login {
             display: inline-flex; align-items: center; gap: 9px;
-            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            background: linear-gradient(135deg, #048af5, #0471cd);
             color: #fff; font-weight: 700; font-size: .95rem;
-            padding: 13px 28px; border-radius: 10px;
+            padding: 13px 30px; border-radius: 10px;
             text-decoration: none;
-            box-shadow: 0 12px 30px rgba(79,70,229,.35);
-            transition: opacity .15s;
+            box-shadow: 0 12px 30px rgba(4,113,205,.45), 0 0 0 1px rgba(4,138,245,.3) inset;
+            transition: opacity .15s, transform .15s;
         }
-        .btn-login:hover { opacity: .92; }
+        .btn-login:hover { opacity: .92; transform: translateY(-1px); }
 
         /* ---- Features ---- */
         .features {
+            position: relative;
+            z-index: 1;
             max-width: 1040px;
             margin: -56px auto 64px;
             padding: 0 24px;
@@ -62,7 +77,7 @@
         }
         .feature-icon {
             width: 42px; height: 42px;
-            background: #eef2ff; color: #4f46e5;
+            background: #e6efff; color: #0471cd;
             border-radius: 11px;
             display: flex; align-items: center; justify-content: center;
             font-size: 1.1rem;
@@ -82,8 +97,8 @@
 <body>
 
     <section class="hero">
-        <div class="hero-icon"><i class="fas fa-capsules"></i></div>
-        <h1>FarmaSystem</h1>
+        <div class="hero-icon"><i class="fas fa-rocket"></i></div>
+        <h1>Gravity</h1>
         <p>Sistema de punto de venta y gestión para farmacias, con soporte multi-sucursal y facturación electrónica SUNAT.</p>
         <a class="btn-login" href="modules/auth/login.php">
             <i class="fas fa-right-to-bracket"></i> Iniciar sesión
@@ -126,7 +141,7 @@
     </section>
 
     <footer>
-        &copy; <?= date('Y') ?> FarmaSystem
+        &copy; <?= date('Y') ?> Gravity
     </footer>
 
 </body>

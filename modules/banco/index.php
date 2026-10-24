@@ -4,7 +4,7 @@ require_once '../../config/database.php';
 $base_path      = '../../';
 $current_module = 'banco';
 $current_page   = 'banco';
-$page_title     = 'Banco — FarmaSystem';
+$page_title     = 'Banco — Gravity';
 $breadcrumb     = '<strong>Banco</strong>';
 $required_roles = ['admin', 'gerente'];
 

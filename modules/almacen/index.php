@@ -9,7 +9,7 @@ require_once '../../config/database.php';
 $base_path      = '../../';
 $current_module = 'almacen';
 $current_page   = 'almacen';
-$page_title     = 'Almacén — FarmaSystem';
+$page_title     = 'Almacén — Gravity';
 $breadcrumb     = '<strong>Almacén</strong>';
 
 $db = getDB();

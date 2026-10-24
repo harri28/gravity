@@ -16,7 +16,7 @@ require_once __DIR__ . '/auth.php';   // inicia sesión y carga helpers
 
 define('DB_HOST', 'localhost');
 define('DB_PORT', '5432');
-define('DB_NAME', 'farmacia');
+define('DB_NAME', 'gravity');
 define('DB_USER', 'postgres');
 define('DB_PASS', '1234');
 
@@ -56,6 +56,20 @@ function jsonResponse(array $data, int $code = 200): void
     header('Content-Type: application/json; charset=UTF-8');
     echo json_encode($data, JSON_UNESCAPED_UNICODE);
     exit;
+}
+
+function getSuperadminTemaOscuro(): bool
+{
+    if (!isSuperadmin() || !sesionId()) {
+        return false;
+    }
+    try {
+        $stmt = getDB()->prepare("SELECT tema_oscuro FROM public.superadmins WHERE id = :id");
+        $stmt->execute([':id' => sesionId()]);
+        return in_array($stmt->fetchColumn(), [true, 't', 1, '1'], true);
+    } catch (Exception $e) {
+        return false;
+    }
 }
 
 function registrarAuditoria(string $accion, string $modulo = '', string $detalle = ''): void
@@ -140,7 +154,15 @@ function app_public_prefix(): string
     // que las URLs públicas (ej. el enlace de "Mi Comprobante") funcionen en
     // ambos entornos sin hardcodear ninguno de los dos.
     $docRoot = rtrim(str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
-    $appRoot = rtrim(str_replace('\\', '/', __DIR__ . '/..'), '/');
+    // realpath() colapsa el /config/.. para que el prefijo salga limpio
+    // (/gravity en vez de /gravity/config/..) — importante tanto para URLs
+    // públicas (WhatsApp del comprobante, img src del fondo) como para el
+    // match contra DocumentRoot.
+    $appRoot = realpath(__DIR__ . '/..');
+    if ($appRoot === false) {
+        return '';
+    }
+    $appRoot = rtrim(str_replace('\\', '/', $appRoot), '/');
 
     if ($docRoot === '' || strpos($appRoot, $docRoot) !== 0) {
         return '';
@@ -156,7 +178,7 @@ function getTenantConfig(): array
 
     $tid = sesionTenantId();
     if (!$tid) {
-        return $cfg = ['nombre_sistema' => 'FarmaSystem', 'logo_path' => null, 'tema_oscuro' => false];
+        return $cfg = ['nombre_sistema' => 'Gravity', 'logo_path' => null, 'tema_oscuro' => false];
     }
     try {
         $stmt = getDB()->prepare(
@@ -164,9 +186,9 @@ function getTenantConfig(): array
         );
         $stmt->execute([':tid' => $tid]);
         $row = $stmt->fetch();
-        $cfg = $row ?: ['nombre_sistema' => 'FarmaSystem', 'logo_path' => null, 'tema_oscuro' => false];
+        $cfg = $row ?: ['nombre_sistema' => 'Gravity', 'logo_path' => null, 'tema_oscuro' => false];
     } catch (Exception $e) {
-        $cfg = ['nombre_sistema' => 'FarmaSystem', 'logo_path' => null, 'tema_oscuro' => false];
+        $cfg = ['nombre_sistema' => 'Gravity', 'logo_path' => null, 'tema_oscuro' => false];
     }
     return $cfg;
 }

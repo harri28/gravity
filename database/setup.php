@@ -163,7 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Setup inicial — FarmaSystem</title>
+    <title>Setup inicial — Gravity</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -196,7 +196,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <div class="container">
 
     <div class="header">
-        <h1><i class="fas fa-cogs"></i> Setup inicial — FarmaSystem</h1>
+        <h1><i class="fas fa-cogs"></i> Setup inicial — Gravity</h1>
         <p>Configura la primera sucursal y crea los usuarios de acceso.</p>
     </div>
 

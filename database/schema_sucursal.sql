@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS productos (
     requiere_receta  BOOLEAN        DEFAULT FALSE,
     activo           BOOLEAN        DEFAULT TRUE,
     favorito         BOOLEAN        DEFAULT FALSE,
-    total_vendido    INTEGER        DEFAULT 0,
+    total_vendido    DECIMAL(10,2)  DEFAULT 0,
     fecha_vencimiento DATE,
     -- Campos de facturacion electronica (migration_09/22/26)
     codigo_interno       VARCHAR(50),
@@ -175,10 +175,15 @@ CREATE TABLE IF NOT EXISTS ventas (
     estado_cpe             INTEGER,
     ticket_sunat           VARCHAR(100),
     qr                     TEXT,
+    -- Link reverso cuando esta venta se emitio al cobrar una mesa (comanda).
+    -- NO es FK (evita dependencia circular con la tabla comandas, que se crea mas
+    -- abajo y a su vez tiene venta_id apuntando a ventas.id).
+    comanda_id             INTEGER,
     created_at       TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_ventas_fecha_emision ON ventas (fecha_emision);
 CREATE INDEX IF NOT EXISTS idx_ventas_codigo_tipo_documento ON ventas (codigo_tipo_documento);
+CREATE INDEX IF NOT EXISTS idx_ventas_comanda ON ventas (comanda_id) WHERE comanda_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS venta_detalles (
     id                     SERIAL PRIMARY KEY,
@@ -207,6 +212,69 @@ CREATE TABLE IF NOT EXISTS venta_detalles (
     cantidad_bolsas        DECIMAL(18,2) DEFAULT 0,
     created_at             TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ============================================================
+-- Mesas / Comandas (modelo karaoke/bar/licoreria, migration_59)
+-- ============================================================
+-- Flujo: mozo abre una mesa libre -> agrega items a la comanda abierta
+-- (descuenta stock al agregar) -> cliente pide la cuenta -> cajero clickea
+-- "Cobrar" -> emite el comprobante reutilizando ventas/registrar_venta,
+-- cierra la comanda, libera la mesa, y la venta aparece en el Historial
+-- de siempre con un link reverso via ventas.comanda_id.
+--
+-- Reglas garantizadas a nivel BD:
+--   - Numero de mesa unico dentro de la sucursal (UNIQUE)
+--   - Solo UNA comanda abierta por mesa a la vez (indice parcial unico)
+--   - estado restringido a 'abierta'|'cerrada'|'anulada'
+--
+-- Catalogo editable desde Admin -> Mesas (modulo admin).
+
+CREATE TABLE IF NOT EXISTS mesas (
+    id          SERIAL PRIMARY KEY,
+    numero      VARCHAR(20)   NOT NULL UNIQUE,
+    nombre      VARCHAR(80),
+    capacidad   INTEGER,
+    activa      BOOLEAN       NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_mesas_activa ON mesas (activa);
+
+CREATE TABLE IF NOT EXISTS comandas (
+    id                   SERIAL PRIMARY KEY,
+    mesa_id              INTEGER       NOT NULL REFERENCES mesas(id),
+    usuario_apertura_id  INTEGER       NOT NULL,  -- ref public.usuarios (sin FK cross-schema)
+    usuario_cierre_id    INTEGER,                 -- ref public.usuarios
+    hora_apertura        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    hora_cierre          TIMESTAMP,
+    estado               VARCHAR(20)   NOT NULL DEFAULT 'abierta',
+    total                DECIMAL(10,2) NOT NULL DEFAULT 0,
+    venta_id             INTEGER,       -- se setea al cobrar (ref local a ventas.id)
+    comanda_padre_id     INTEGER REFERENCES comandas(id),
+                                       -- futuro: "recuperar mesa" = reabrir una comanda
+                                       -- cerrada en otra mesa como una nueva comanda hija
+    motivo_anulacion     TEXT,
+    observaciones        TEXT,
+    created_at           TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ck_comandas_estado CHECK (estado IN ('abierta','cerrada','anulada'))
+);
+-- UNA sola comanda abierta por mesa a la vez
+CREATE UNIQUE INDEX IF NOT EXISTS uq_comandas_mesa_abierta
+    ON comandas (mesa_id) WHERE estado = 'abierta';
+CREATE INDEX IF NOT EXISTS idx_comandas_estado ON comandas (estado);
+CREATE INDEX IF NOT EXISTS idx_comandas_venta  ON comandas (venta_id) WHERE venta_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS comanda_items (
+    id              SERIAL PRIMARY KEY,
+    comanda_id      INTEGER       NOT NULL REFERENCES comandas(id) ON DELETE CASCADE,
+    producto_id     INTEGER       NOT NULL REFERENCES productos(id),
+    cantidad        DECIMAL(10,3) NOT NULL DEFAULT 1,
+    precio_unitario DECIMAL(10,2) NOT NULL,
+    subtotal        DECIMAL(10,2) NOT NULL,
+    hora_pedido     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    usuario_id      INTEGER       NOT NULL,   -- quien agrego el item (ref public.usuarios)
+    notas           TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_comanda_items_comanda ON comanda_items (comanda_id);
 
 CREATE TABLE IF NOT EXISTS proveedores (
     id               SERIAL PRIMARY KEY,

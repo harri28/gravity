@@ -9,6 +9,7 @@ credenciales_sunat.md
 facturacion/certs/*.pfx
 facturacion/certs/*.p12
 facturacion/certs/*.pem
+facturacion/certs/*.bak*
 facturacion/cacert.pem
 
 # ─── Archivos generados por SUNAT en runtime ──────────────────
@@ -26,6 +27,9 @@ facturacion/storage/soap/*
 *.bak
 *.dump
 farmacia.sql
+farmacia_dump.sql
+gravity.sql
+gravity_dump.sql
 
 # ─── Logs y caché ─────────────────────────────────────────────
 logs/
@@ -62,3 +66,17 @@ desktop.ini
 # ─── Claude Code ──────────────────────────────────────────────
 .claude/*.bak
 .claude/worktrees/
+.claude/settings.json
+.claude/settings.local.json
+
+# ─── Archivos personales / adjuntos / datos externos ─────────
+# Documentos y binarios sueltos que no son parte del proyecto
+*.pptx
+*.docx
+*.pdf
+conexion_sunat.zip
+datos_sistema_origen/
+nueva_botica/
+gravity.jpg
+"info6micro (1).pdf"
+"avcance xd.docx"

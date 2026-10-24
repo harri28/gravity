@@ -1,3 +1,3 @@
 <?php
-header('Location: index.php?tab=ventas');
+header('Location: pos.php?tab=ventas');
 exit;

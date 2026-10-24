@@ -18,6 +18,7 @@ $admin_only = [
     'usuario_cambiar_password', 'usuario_toggle_activo',
     'asignar_acceso', 'revocar_acceso',
     'sucursales_listar', 'sucursal_crear', 'sucursal_actualizar', 'sucursal_toggle_activo',
+    'mesa_crear', 'mesa_actualizar', 'mesa_toggle_activa',
     'config_guardar', 'logo_subir', 'logo_eliminar', 'certificate_subir',
     'tema_guardar',
 ];
@@ -327,6 +328,126 @@ switch ($action) {
         jsonResponse(['error' => false, 'activo' => $suc_row['activo']]);
 
     // ================================================================
+    // MESAS (catalogo de mesas de la sucursal actual, migration_59)
+    // getDB() ya aplico SET search_path al schema de la sucursal activa,
+    // asi que un SELECT/INSERT/UPDATE sin esquema explicito ya opera
+    // sobre las mesas de ESTA sucursal (no de todas).
+    // ================================================================
+
+    case 'mesas_listar':
+        // Join con la comanda abierta (si la hay) para que el UI pueda
+        // mostrar "ocupada" sin pedir otro endpoint y bloquear la
+        // desactivacion de mesas en uso.
+        $stmt = $db->query("
+            SELECT m.id, m.numero, m.nombre, m.capacidad, m.activa, m.created_at,
+                   c.id AS comanda_abierta_id
+            FROM mesas m
+            LEFT JOIN comandas c ON c.mesa_id = m.id AND c.estado = 'abierta'
+            ORDER BY m.numero ASC
+        ");
+        echo json_encode($stmt->fetchAll());
+        break;
+
+    case 'mesa_crear':
+        $d        = json_decode(file_get_contents('php://input'), true);
+        $numero   = trim($d['numero'] ?? '');
+        $nombre   = trim($d['nombre'] ?? '');
+        $capacidad = $d['capacidad'] ?? null;
+
+        if ($numero === '') {
+            jsonResponse(['error' => true, 'message' => 'El numero de mesa es requerido'], 400);
+        }
+        if (mb_strlen($numero) > 20) {
+            jsonResponse(['error' => true, 'message' => 'El numero no puede superar 20 caracteres'], 400);
+        }
+        if ($capacidad !== null && $capacidad !== '' && (!ctype_digit((string)$capacidad) || (int)$capacidad < 1)) {
+            jsonResponse(['error' => true, 'message' => 'La capacidad debe ser un entero positivo'], 400);
+        }
+
+        try {
+            $stmt = $db->prepare("
+                INSERT INTO mesas (numero, nombre, capacidad)
+                VALUES (:n, :nom, :cap)
+                RETURNING id
+            ");
+            $stmt->execute([
+                ':n'   => $numero,
+                ':nom' => $nombre !== '' ? $nombre : null,
+                ':cap' => ($capacidad === null || $capacidad === '') ? null : (int)$capacidad,
+            ]);
+            $nueva_id = $stmt->fetch()['id'];
+        } catch (PDOException $e) {
+            if ($e->getCode() === '23505') { // unique_violation
+                jsonResponse(['error' => true, 'message' => "Ya existe una mesa con el numero '{$numero}'"], 400);
+            }
+            throw $e;
+        }
+
+        registrarAuditoria('Creacion de mesa', 'admin', "Mesa #{$numero}" . ($nombre !== '' ? " ({$nombre})" : ''));
+        jsonResponse(['error' => false, 'message' => 'Mesa creada', 'id' => $nueva_id]);
+
+    case 'mesa_actualizar':
+        $d         = json_decode(file_get_contents('php://input'), true);
+        $id        = intval($d['id'] ?? 0);
+        $numero    = trim($d['numero'] ?? '');
+        $nombre    = trim($d['nombre'] ?? '');
+        $capacidad = $d['capacidad'] ?? null;
+
+        if (!$id || $numero === '') {
+            jsonResponse(['error' => true, 'message' => 'Datos incompletos'], 400);
+        }
+        if (mb_strlen($numero) > 20) {
+            jsonResponse(['error' => true, 'message' => 'El numero no puede superar 20 caracteres'], 400);
+        }
+        if ($capacidad !== null && $capacidad !== '' && (!ctype_digit((string)$capacidad) || (int)$capacidad < 1)) {
+            jsonResponse(['error' => true, 'message' => 'La capacidad debe ser un entero positivo'], 400);
+        }
+
+        try {
+            $db->prepare("
+                UPDATE mesas SET numero = :n, nombre = :nom, capacidad = :cap
+                WHERE id = :id
+            ")->execute([
+                ':n'   => $numero,
+                ':nom' => $nombre !== '' ? $nombre : null,
+                ':cap' => ($capacidad === null || $capacidad === '') ? null : (int)$capacidad,
+                ':id'  => $id,
+            ]);
+        } catch (PDOException $e) {
+            if ($e->getCode() === '23505') {
+                jsonResponse(['error' => true, 'message' => "Ya existe otra mesa con el numero '{$numero}'"], 400);
+            }
+            throw $e;
+        }
+
+        registrarAuditoria('Edicion de mesa', 'admin', "Mesa ID: {$id} | Nuevo numero: {$numero}");
+        jsonResponse(['error' => false, 'message' => 'Mesa actualizada']);
+
+    case 'mesa_toggle_activa':
+        $d  = json_decode(file_get_contents('php://input'), true);
+        $id = intval($d['id'] ?? 0);
+        if (!$id) {
+            jsonResponse(['error' => true, 'message' => 'Mesa no especificada'], 400);
+        }
+        // No permitir desactivar una mesa con comanda abierta: cobraria
+        // raro ver una mesa "inactiva" en Admin y "ocupada" en Ventas al mismo tiempo.
+        $check = $db->prepare("SELECT 1 FROM comandas WHERE mesa_id = :id AND estado = 'abierta' LIMIT 1");
+        $check->execute([':id' => $id]);
+        if ($check->fetch()) {
+            jsonResponse(['error' => true, 'message' => 'No se puede desactivar: la mesa tiene una comanda abierta. Cobra o anula primero.'], 400);
+        }
+
+        $stmt = $db->prepare("UPDATE mesas SET activa = NOT activa WHERE id = :id RETURNING activa, numero");
+        $stmt->execute([':id' => $id]);
+        $mesa_row = $stmt->fetch();
+        if (!$mesa_row) {
+            jsonResponse(['error' => true, 'message' => 'Mesa no encontrada'], 404);
+        }
+
+        registrarAuditoria('Cambio de estado de mesa', 'admin', "Mesa #{$mesa_row['numero']} | Activa: " . ($mesa_row['activa'] ? 'si' : 'no'));
+        jsonResponse(['error' => false, 'activa' => $mesa_row['activa']]);
+
+    // ================================================================
     // CONFIGURACIÓN DE MARCA
     // ================================================================
 
@@ -357,7 +478,7 @@ switch ($action) {
                 t.certificate_password,
                 t.certificate_expires_at,
                 t.sunat_server,
-                COALESCE(tc.nombre_sistema, 'FarmaSystem') AS nombre_sistema,
+                COALESCE(tc.nombre_sistema, 'Gravity') AS nombre_sistema,
                 tc.logo_path
             FROM public.tenants t
             LEFT JOIN public.tenant_config tc ON tc.tenant_id = t.id
@@ -389,7 +510,7 @@ switch ($action) {
             'certificate_password' => '',
             'certificate_expires_at' => '',
             'sunat_server' => '3',
-            'nombre_sistema' => 'FarmaSystem',
+            'nombre_sistema' => 'Gravity',
             'logo_path' => null,
         ];
         echo json_encode($row);

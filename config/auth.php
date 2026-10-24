@@ -89,7 +89,7 @@ function _loginUrl(): string { return _appRoot() . '/modules/auth/login.php'; }
 
 function _render403(): void { ?>
     <!DOCTYPE html><html lang="es"><head>
-    <meta charset="UTF-8"><title>Acceso denegado — FarmaSystem</title>
+    <meta charset="UTF-8"><title>Acceso denegado — Gravity</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
         body{font-family:'Segoe UI',system-ui,sans-serif;background:#f1f5f9;display:flex;align-items:center;

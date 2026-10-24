@@ -9,7 +9,7 @@ require_once '../../config/database.php';
 $base_path      = '../../';
 $current_module = 'ventas';
 $current_page   = 'favoritos';
-$page_title     = 'Favoritos y Más Vendidos — FarmaSystem';
+$page_title     = 'Favoritos y Más Vendidos — Gravity';
 $breadcrumb     = '<strong>Ventas</strong> / Favoritos y Más Vendidos';
 
 include '../../includes/header.php';
@@ -162,7 +162,7 @@ function loadTopVendidos() {
 function renderTopList(data) {
     const el = document.getElementById('top-list');
     if (!data.length) { el.innerHTML = '<p style="text-align:center;color:var(--text-light);padding:20px">Sin datos</p>'; return; }
-    const max = parseInt(data[0].total_vendido) || 1;
+    const max = parseFloat(data[0].total_vendido) || 1;
     const rankClasses = ['gold','silver','bronze'];
     el.innerHTML = data.map((p, i) => `
         <div class="top-product-row">
@@ -173,11 +173,11 @@ function renderTopList(data) {
                     <span style="color:var(--text-muted);font-size:.78rem">${p.total_vendido} uds</span>
                 </div>
                 <div class="top-bar-track">
-                    <div class="top-bar-fill" style="width:${Math.round(parseInt(p.total_vendido)/max*100)}%"></div>
+                    <div class="top-bar-fill" style="width:${Math.round(parseFloat(p.total_vendido)/max*100)}%"></div>
                 </div>
             </div>
             <span style="font-size:.8rem;font-weight:700;color:var(--success);min-width:60px;text-align:right">
-                S/ ${(parseFloat(p.precio_venta)*parseInt(p.total_vendido)).toFixed(0)}
+                S/ ${(parseFloat(p.precio_venta)*parseFloat(p.total_vendido)).toFixed(0)}
             </span>
         </div>`).join('');
 }
@@ -198,7 +198,7 @@ function renderTablaTop(data) {
             <td class="text-right"><strong>${p.total_vendido}</strong></td>
             <td class="text-right">S/ ${parseFloat(p.precio_venta).toFixed(2)}</td>
             <td class="text-right" style="color:var(--success);font-weight:600">
-                S/ ${(parseFloat(p.precio_venta)*parseInt(p.total_vendido)).toFixed(2)}
+                S/ ${(parseFloat(p.precio_venta)*parseFloat(p.total_vendido)).toFixed(2)}
             </td>
             <td>
                 <button onclick="toggleFav(${p.id},this)" class="btn btn-ghost btn-sm"
@@ -221,9 +221,9 @@ function loadResumenGeneral() {
     fetch(BASE + 'modules/ventas/api.php?action=top_vendidos&limite=1000')
         .then(r => r.json())
         .then(data => {
-            const totalUds  = data.reduce((s,p) => s + parseInt(p.total_vendido), 0);
-            const totalIngs = data.reduce((s,p) => s + parseFloat(p.precio_venta)*parseInt(p.total_vendido), 0);
-            const conVentas = data.filter(p => parseInt(p.total_vendido) > 0).length;
+            const totalUds  = data.reduce((s,p) => s + parseFloat(p.total_vendido), 0);
+            const totalIngs = data.reduce((s,p) => s + parseFloat(p.precio_venta)*parseFloat(p.total_vendido), 0);
+            const conVentas = data.filter(p => parseFloat(p.total_vendido) > 0).length;
             document.getElementById('resumen-general').innerHTML = `
                 <div class="row g-2 p-3">
                     <div class="col-6"><div style="background:var(--primary-light);border-radius:var(--radius-sm);padding:14px;text-align:center">
@@ -254,7 +254,7 @@ function loadCatStats() {
             data.forEach(p => {
                 const cat = p.categoria || 'Sin categoría';
                 if (!byCat[cat]) byCat[cat] = 0;
-                byCat[cat] += parseInt(p.total_vendido);
+                byCat[cat] += parseFloat(p.total_vendido);
             });
             const sorted = Object.entries(byCat).sort((a,b) => b[1]-a[1]);
             const maxVal = sorted[0]?.[1] || 1;

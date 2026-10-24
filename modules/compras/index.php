@@ -3,7 +3,7 @@ $required_roles  = ['admin', 'gerente', 'cajero'];
 $base_path       = '../../';
 $current_module  = 'compras';
 $current_page    = 'compras';
-$page_title      = 'Compras — FarmaSystem';
+$page_title      = 'Compras — Gravity';
 $breadcrumb      = '<i class="fas fa-shopping-cart"></i> Compras';
 require_once '../../config/database.php';
 require_once '../../includes/header.php';

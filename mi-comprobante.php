@@ -114,7 +114,7 @@ $detStmt = $pdo->prepare('
 $detStmt->execute([':vid' => $ventaId]);
 $items = $detStmt->fetchAll();
 
-$empresaNombre = $brand['business_name'] ?: ($brand['trade_name'] ?: ($brand['tenant_nombre'] ?? 'FarmaSystem'));
+$empresaNombre = $brand['business_name'] ?: ($brand['trade_name'] ?: ($brand['tenant_nombre'] ?? 'Gravity'));
 $numComp = $venta['numero_completo'] ?: $venta['numero_venta'];
 $COMP_LABELS = ['boleta' => 'Boleta de Venta Electrónica', 'factura' => 'Factura Electrónica', 'ticket' => 'Ticket de Venta'];
 $compLabel = $COMP_LABELS[$venta['tipo_comprobante']] ?? 'Comprobante de Venta';

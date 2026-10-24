@@ -10,7 +10,7 @@ $base_path      = '../../';
 $required_roles = ['admin', 'gerente'];
 $current_module = 'reportes';
 $current_page   = 'reportes';
-$page_title     = 'Reportes — FarmaSystem';
+$page_title     = 'Reportes — Gravity';
 $breadcrumb     = '<strong>Reportes</strong>';
 
 include '../../includes/header.php';

@@ -10,7 +10,7 @@ $required_roles = ['admin', 'gerente', 'cajero'];
 $base_path      = '../../';
 $current_module = 'dashboard';
 $current_page   = 'inicio';
-$page_title     = 'Dashboard — FarmaSystem';
+$page_title     = 'Dashboard — Gravity';
 $breadcrumb     = '<strong>Dashboard</strong>';
 
 include '../../includes/header.php';

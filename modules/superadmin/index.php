@@ -8,13 +8,14 @@ $required_roles = ['superadmin'];
 $base_path      = '../../';
 $current_module = 'superadmin';
 $current_page   = 'dashboard';
-$page_title     = 'Panel Superadmin — FarmaSystem';
+$page_title     = 'Panel Superadmin — Gravity';
 $breadcrumb     = '<i class="fas fa-shield-alt"></i> Panel Superadmin';
 
-require_once '../../config/auth.php';
+require_once '../../config/database.php';
 requireAuth($required_roles);
+$_sa_tema_oscuro = getSuperadminTemaOscuro();
 ?><!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="<?= $_sa_tema_oscuro ? 'dark' : 'light' ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -25,17 +26,45 @@ requireAuth($required_roles);
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+        :root {
+            --sa-bg: #f1f5f9;
+            --sa-surface: #fff;
+            --sa-surface-2: #f8fafc;
+            --sa-border: #e2e8f0;
+            --sa-text: #1e293b;
+            --sa-text-secondary: #475569;
+            --sa-text-muted: #64748b;
+            --sa-text-light: #94a3b8;
+        }
+        :root[data-theme="dark"] {
+            --sa-bg: #0B1220;
+            --sa-surface: #111827;
+            --sa-surface-2: #1A2333;
+            --sa-border: #2A3547;
+            --sa-text: #E5E7EB;
+            --sa-text-secondary: #CBD5E1;
+            --sa-text-muted: #94A3B8;
+            --sa-text-light: #64748B;
+        }
+        @media print {
+            :root, :root[data-theme="dark"] {
+                --sa-bg: #fff; --sa-surface: #fff; --sa-surface-2: #f8fafc;
+                --sa-border: #e2e8f0; --sa-text: #1e293b;
+                --sa-text-secondary: #475569; --sa-text-muted: #64748b; --sa-text-light: #94a3b8;
+            }
+        }
+
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
-            background: #f1f5f9;
-            color: #1e293b;
+            background: var(--sa-bg);
+            color: var(--sa-text);
             min-height: 100vh;
         }
 
         /* ---- Topbar ---- */
         .topbar {
-            background: #fff;
-            border-bottom: 1px solid #e2e8f0;
+            background: var(--sa-surface);
+            border-bottom: 1px solid var(--sa-border);
             padding: 0 24px;
             height: 60px;
             display: flex;
@@ -52,7 +81,7 @@ requireAuth($required_roles);
             gap: 12px;
             font-weight: 700;
             font-size: 1rem;
-            color: #1e293b;
+            color: var(--sa-text);
         }
         .topbar-brand .badge-sa {
             background: linear-gradient(135deg, #6366f1, #4f46e5);
@@ -69,16 +98,16 @@ requireAuth($required_roles);
             align-items: center;
             gap: 16px;
             font-size: .85rem;
-            color: #64748b;
+            color: var(--sa-text-muted);
         }
-        .topbar-right .user-info strong { color: #1e293b; }
+        .topbar-right .user-info strong { color: var(--sa-text); }
         .btn-logout {
             display: flex;
             align-items: center;
             gap: 6px;
-            background: #f1f5f9;
-            color: #475569;
-            border: 1px solid #e2e8f0;
+            background: var(--sa-bg);
+            color: var(--sa-text-secondary);
+            border: 1px solid var(--sa-border);
             padding: 7px 14px;
             border-radius: 8px;
             cursor: pointer;
@@ -101,9 +130,9 @@ requireAuth($required_roles);
         .page-header h1 {
             font-size: 1.4rem;
             font-weight: 700;
-            color: #1e293b;
+            color: var(--sa-text);
         }
-        .page-header p { color: #64748b; font-size: .85rem; margin-top: 2px; }
+        .page-header p { color: var(--sa-text-muted); font-size: .85rem; margin-top: 2px; }
 
         /* ---- Stat cards ---- */
         .stats-grid {
@@ -113,8 +142,8 @@ requireAuth($required_roles);
             margin-bottom: 32px;
         }
         .stat-card {
-            background: #fff;
-            border: 1px solid #e2e8f0;
+            background: var(--sa-surface);
+            border: 1px solid var(--sa-border);
             border-radius: 12px;
             padding: 20px;
             display: flex;
@@ -136,8 +165,8 @@ requireAuth($required_roles);
         .stat-icon.green   { background: #dcfce7; color: #16a34a; }
         .stat-icon.blue    { background: #dbeafe; color: #2563eb; }
         .stat-icon.amber   { background: #fef3c7; color: #d97706; }
-        .stat-value { font-size: 1.8rem; font-weight: 700; color: #1e293b; line-height: 1; }
-        .stat-label { font-size: .78rem; color: #64748b; margin-top: 3px; }
+        .stat-value { font-size: 1.8rem; font-weight: 700; color: var(--sa-text); line-height: 1; }
+        .stat-label { font-size: .78rem; color: var(--sa-text-muted); margin-top: 3px; }
 
         /* ---- Section header ---- */
         .section-header {
@@ -149,7 +178,7 @@ requireAuth($required_roles);
         .section-title {
             font-size: 1rem;
             font-weight: 700;
-            color: #1e293b;
+            color: var(--sa-text);
         }
 
         /* ---- Primary button ---- */
@@ -171,8 +200,8 @@ requireAuth($required_roles);
 
         /* ---- Table ---- */
         .table-wrap {
-            background: #fff;
-            border: 1px solid #e2e8f0;
+            background: var(--sa-surface);
+            border: 1px solid var(--sa-border);
             border-radius: 12px;
             overflow-x: auto;
             box-shadow: 0 1px 3px rgba(0,0,0,.04);
@@ -180,24 +209,24 @@ requireAuth($required_roles);
         #sucursalesLista, #usuariosLista { overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; }
         thead th {
-            background: #f8fafc;
+            background: var(--sa-surface-2);
             padding: 12px 16px;
             font-size: .75rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: .05em;
-            color: #64748b;
+            color: var(--sa-text-muted);
             text-align: left;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid var(--sa-border);
         }
-        tbody tr { border-bottom: 1px solid #f1f5f9; transition: background .1s, box-shadow .1s; }
+        tbody tr { border-bottom: 1px solid var(--sa-bg); transition: background .1s, box-shadow .1s; }
         tbody tr:last-child { border-bottom: none; }
         tbody tr.clickable-row { cursor: pointer; }
         tbody tr.clickable-row:hover { background: #f0f4ff; }
         tbody tr.clickable-row:hover td:first-child { color: #4f46e5; }
-        td { padding: 13px 16px; font-size: .88rem; color: #475569; vertical-align: middle; }
-        .td-main { font-weight: 600; color: #1e293b; }
-        .td-mono { font-family: monospace; font-size: .82rem; color: #64748b; }
+        td { padding: 13px 16px; font-size: .88rem; color: var(--sa-text-secondary); vertical-align: middle; }
+        .td-main { font-weight: 600; color: var(--sa-text); }
+        .td-mono { font-family: monospace; font-size: .82rem; color: var(--sa-text-muted); }
 
         /* ---- Badges ---- */
         .badge {
@@ -210,7 +239,7 @@ requireAuth($required_roles);
         }
         .badge-activo   { background: #dcfce7; color: #16a34a; }
         .badge-inactivo { background: #fee2e2; color: #dc2626; }
-        .badge-basico     { background: #e2e8f0 !important; color: #475569 !important; }
+        .badge-basico     { background: var(--sa-border) !important; color: var(--sa-text-secondary) !important; }
         .badge-pro        { background: #fef3c7 !important; color: #b45309 !important; }
         .badge-enterprise { background: #ede9fe !important; color: #6d28d9 !important; }
 
@@ -252,8 +281,8 @@ requireAuth($required_roles);
         .modal-overlay.active { display: flex; }
         .modal {
             display: block;
-            background: #fff;
-            border: 1px solid #e2e8f0;
+            background: var(--sa-surface);
+            border: 1px solid var(--sa-border);
             border-radius: 16px;
             width: 100%;
             max-width: 480px;
@@ -266,27 +295,27 @@ requireAuth($required_roles);
         }
         .modal-header {
             padding: 20px 24px 16px;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid var(--sa-border);
             display: flex;
             align-items: center;
             justify-content: space-between;
         }
-        .modal-title { font-size: 1rem; font-weight: 700; color: #1e293b; }
+        .modal-title { font-size: 1rem; font-weight: 700; color: var(--sa-text); }
         .modal-close {
             background: none;
             border: none;
-            color: #94a3b8;
+            color: var(--sa-text-light);
             cursor: pointer;
             font-size: 1.1rem;
             padding: 4px;
             border-radius: 6px;
             transition: color .15s;
         }
-        .modal-close:hover { color: #1e293b; }
+        .modal-close:hover { color: var(--sa-text); }
         .modal-body { padding: 20px 24px; }
         .modal-footer {
             padding: 16px 24px;
-            border-top: 1px solid #e2e8f0;
+            border-top: 1px solid var(--sa-border);
             display: flex;
             gap: 10px;
             justify-content: flex-end;
@@ -299,7 +328,7 @@ requireAuth($required_roles);
             display: block;
             font-size: .78rem;
             font-weight: 600;
-            color: #64748b;
+            color: var(--sa-text-muted);
             text-transform: uppercase;
             letter-spacing: .04em;
             margin-bottom: 6px;
@@ -307,21 +336,21 @@ requireAuth($required_roles);
         input, select {
             width: 100%;
             padding: 10px 12px;
-            background: #fff;
-            border: 1.5px solid #e2e8f0;
+            background: var(--sa-surface);
+            border: 1.5px solid var(--sa-border);
             border-radius: 8px;
-            color: #1e293b;
+            color: var(--sa-text);
             font-size: .9rem;
             outline: none;
             transition: border-color .15s;
         }
         input:focus, select:focus { border-color: #6366f1; }
-        select option { background: #fff; color: #1e293b; }
+        select option { background: var(--sa-surface); color: var(--sa-text); }
 
         .btn-cancel {
-            background: #f1f5f9;
-            color: #475569;
-            border: 1px solid #e2e8f0;
+            background: var(--sa-bg);
+            color: var(--sa-text-secondary);
+            border: 1px solid var(--sa-border);
             padding: 9px 18px;
             border-radius: 8px;
             cursor: pointer;
@@ -329,13 +358,13 @@ requireAuth($required_roles);
             font-weight: 600;
             transition: background .15s;
         }
-        .btn-cancel:hover { background: #e2e8f0; }
+        .btn-cancel:hover { background: var(--sa-border); }
 
         /* ---- Empty state ---- */
         .empty-state {
             padding: 60px 20px;
             text-align: center;
-            color: #475569;
+            color: var(--sa-text-secondary);
         }
         .empty-state i { font-size: 2.5rem; margin-bottom: 12px; display: block; }
 
@@ -344,12 +373,12 @@ requireAuth($required_roles);
             position: fixed;
             bottom: 24px;
             right: 24px;
-            background: #fff;
-            border: 1px solid #e2e8f0;
+            background: var(--sa-surface);
+            border: 1px solid var(--sa-border);
             border-radius: 10px;
             padding: 12px 18px;
             font-size: .85rem;
-            color: #1e293b;
+            color: var(--sa-text);
             display: flex;
             align-items: center;
             gap: 10px;
@@ -376,7 +405,7 @@ requireAuth($required_roles);
             padding: 12px 18px;
             font-size: .85rem;
             font-weight: 600;
-            color: #64748b;
+            color: var(--sa-text-muted);
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -384,14 +413,14 @@ requireAuth($required_roles);
             transition: color .15s, border-color .15s;
             margin-bottom: -1px;
         }
-        .tab-btn:hover  { color: #1e293b; }
+        .tab-btn:hover  { color: var(--sa-text); }
         .tab-btn.active { color: #6366f1; border-bottom-color: #6366f1; }
 
         /* ---- Loading ---- */
         .loading-row td {
             text-align: center;
             padding: 48px;
-            color: #64748b;
+            color: var(--sa-text-muted);
         }
 
         /* ---- Grid 2 cols ---- */
@@ -400,6 +429,22 @@ requireAuth($required_roles);
 
         /* ---- Planes grid ---- */
         .planes-grid { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+
+        /* ---- Switch modo oscuro (estilo iOS) ---- */
+        .ios-switch { position: relative; display: inline-block; width: 44px; height: 26px; flex-shrink: 0; }
+        .ios-switch input { opacity: 0; width: 0; height: 0; }
+        .ios-switch-slider {
+            position: absolute; inset: 0; cursor: pointer;
+            background-color: var(--sa-border); border-radius: 34px; transition: .25s;
+        }
+        .ios-switch-slider::before {
+            position: absolute; content: ""; height: 22px; width: 22px; left: 2px; top: 2px;
+            background-color: #fff; border-radius: 50%; transition: .25s;
+            box-shadow: 0 2px 4px rgba(0,0,0,.25);
+        }
+        .ios-switch input:checked + .ios-switch-slider { background-color: #34C759; }
+        .ios-switch input:checked + .ios-switch-slider::before { transform: translateX(18px); }
+        .ios-switch input:disabled + .ios-switch-slider { opacity: .6; cursor: default; }
 
         /* ---- Mobile (celular, Android/iOS) ---- */
         @media (max-width: 640px) {
@@ -426,10 +471,14 @@ requireAuth($required_roles);
 <div class="topbar">
     <div class="topbar-brand">
         <i class="fas fa-shield-alt" style="color:#6366f1"></i>
-        FarmaSystem
+        Gravity
         <span class="badge-sa">Superadmin</span>
     </div>
     <div class="topbar-right">
+        <label class="ios-switch" title="Modo oscuro">
+            <input type="checkbox" id="tema-switch" onchange="aplicarTema(this.checked)" <?= $_sa_tema_oscuro ? 'checked' : '' ?>>
+            <span class="ios-switch-slider"></span>
+        </label>
         <span class="user-info">
             <strong><?= htmlspecialchars(sesionNombre()) ?></strong>
         </span>
@@ -455,8 +504,8 @@ requireAuth($required_roles);
     <!-- Planes -->
     <div style="margin-bottom:20px">
         <button onclick="togglePlanes()" id="btn-ver-planes"
-                style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 16px;
-                       font-size:.82rem;font-weight:600;color:#475569;cursor:pointer;display:flex;align-items:center;gap:6px">
+                style="background:var(--sa-surface-2);border:1.5px solid var(--sa-border);border-radius:8px;padding:7px 16px;
+                       font-size:.82rem;font-weight:600;color:var(--sa-text-secondary);cursor:pointer;display:flex;align-items:center;gap:6px">
             <i class="fas fa-layer-group" style="color:#6366f1"></i>
             Ver planes
             <i class="fas fa-chevron-down" id="planes-chevron" style="font-size:.7rem;transition:transform .2s"></i>
@@ -464,11 +513,11 @@ requireAuth($required_roles);
 
         <div id="planes-grid" class="planes-grid" style="display:none;margin-top:12px">
 
-            <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px 18px;border-top:3px solid #94a3b8">
+            <div style="background:var(--sa-surface);border:1.5px solid var(--sa-border);border-radius:12px;padding:16px 18px;border-top:3px solid var(--sa-text-light)">
                 <div style="margin-bottom:8px">
-                    <span style="background:#e2e8f0;color:#475569;font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:20px">BÁSICO</span>
+                    <span style="background:var(--sa-border);color:var(--sa-text-secondary);font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:20px">BÁSICO</span>
                 </div>
-                <ul style="margin:0;padding-left:16px;font-size:.82rem;color:#475569;line-height:1.8">
+                <ul style="margin:0;padding-left:16px;font-size:.82rem;color:var(--sa-text-secondary);line-height:1.8">
                     <li>1 sucursal</li>
                     <li>Hasta 2 usuarios</li>
                     <li>Ventas, inventario y caja</li>
@@ -476,11 +525,11 @@ requireAuth($required_roles);
                 </ul>
             </div>
 
-            <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px 18px;border-top:3px solid #f59e0b">
+            <div style="background:var(--sa-surface);border:1.5px solid var(--sa-border);border-radius:12px;padding:16px 18px;border-top:3px solid #f59e0b">
                 <div style="margin-bottom:8px">
                     <span style="background:#fef3c7;color:#b45309;font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:20px">PRO</span>
                 </div>
-                <ul style="margin:0;padding-left:16px;font-size:.82rem;color:#475569;line-height:1.8">
+                <ul style="margin:0;padding-left:16px;font-size:.82rem;color:var(--sa-text-secondary);line-height:1.8">
                     <li>Hasta 3 sucursales</li>
                     <li>Hasta 10 usuarios</li>
                     <li>Módulo de compras y créditos</li>
@@ -488,11 +537,11 @@ requireAuth($required_roles);
                 </ul>
             </div>
 
-            <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px 18px;border-top:3px solid #6d28d9">
+            <div style="background:var(--sa-surface);border:1.5px solid var(--sa-border);border-radius:12px;padding:16px 18px;border-top:3px solid #6d28d9">
                 <div style="margin-bottom:8px">
                     <span style="background:#ede9fe;color:#6d28d9;font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:20px">ENTERPRISE</span>
                 </div>
-                <ul style="margin:0;padding-left:16px;font-size:.82rem;color:#475569;line-height:1.8">
+                <ul style="margin:0;padding-left:16px;font-size:.82rem;color:var(--sa-text-secondary);line-height:1.8">
                     <li>Sucursales ilimitadas</li>
                     <li>Usuarios ilimitados</li>
                     <li>Todos los módulos</li>
@@ -580,16 +629,16 @@ requireAuth($required_roles);
             <div class="form-group">
                 <label>Logo de la empresa</label>
                 <div style="display:flex;align-items:center;gap:14px">
-                    <div id="logoPreviewWrap" style="width:64px;height:64px;border-radius:10px;border:1px dashed #cbd5e1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#f8fafc;flex-shrink:0">
-                        <i class="fas fa-image" id="logoIconPlaceholder" style="color:#cbd5e1;font-size:1.4rem"></i>
+                    <div id="logoPreviewWrap" style="width:64px;height:64px;border-radius:10px;border:1px dashed var(--sa-text-light);display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--sa-surface-2);flex-shrink:0">
+                        <i class="fas fa-image" id="logoIconPlaceholder" style="color:var(--sa-text-light);font-size:1.4rem"></i>
                         <img id="logoPreviewImg" src="" alt="logo" style="display:none;width:100%;height:100%;object-fit:contain">
                     </div>
                     <div style="flex:1">
-                        <label for="tenantLogoFile" style="display:inline-flex;align-items:center;gap:7px;cursor:pointer;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;padding:8px 14px;font-size:.82rem;font-weight:600;color:#475569">
+                        <label for="tenantLogoFile" style="display:inline-flex;align-items:center;gap:7px;cursor:pointer;background:var(--sa-bg);border:1px solid var(--sa-border);border-radius:8px;padding:8px 14px;font-size:.82rem;font-weight:600;color:var(--sa-text-secondary)">
                             <i class="fas fa-upload"></i> Elegir imagen
                         </label>
                         <input type="file" id="tenantLogoFile" accept="image/*" style="display:none" onchange="previewLogo(this)">
-                        <p id="logoFileName" style="font-size:.75rem;color:#94a3b8;margin-top:6px">JPG, PNG, WEBP — máx. 2 MB</p>
+                        <p id="logoFileName" style="font-size:.75rem;color:var(--sa-text-light);margin-top:6px">JPG, PNG, WEBP — máx. 2 MB</p>
                     </div>
                 </div>
             </div>
@@ -608,10 +657,10 @@ requireAuth($required_roles);
                 </div>
                 <div class="form-group">
                     <label>Plan</label>
-                    <select id="tenantPlan" style="color:#1e293b">
-                        <option value="basico"     style="color:#1e293b">Básico</option>
-                        <option value="pro"        style="color:#1e293b">Pro</option>
-                        <option value="enterprise" style="color:#1e293b">Enterprise</option>
+                    <select id="tenantPlan" style="color:var(--sa-text)">
+                        <option value="basico"     style="color:var(--sa-text)">Básico</option>
+                        <option value="pro"        style="color:var(--sa-text)">Pro</option>
+                        <option value="enterprise" style="color:var(--sa-text)">Enterprise</option>
                     </select>
                 </div>
             </div>
@@ -642,7 +691,7 @@ requireAuth($required_roles);
         </div>
 
         <!-- Pestañas -->
-        <div style="display:flex;border-bottom:1px solid #e2e8f0;padding:0 24px">
+        <div style="display:flex;border-bottom:1px solid var(--sa-border);padding:0 24px">
             <button class="tab-btn active" id="tabBtnSucursales" onclick="switchTab('sucursales')">
                 <i class="fas fa-store"></i> Sucursales
             </button>
@@ -656,15 +705,15 @@ requireAuth($required_roles);
             <div style="padding:16px 24px 0">
                 <div id="sucursalesLista"></div>
             </div>
-            <div style="padding:12px 24px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center">
-                <span style="font-size:.8rem;color:#64748b" id="sucursalesCount"></span>
+            <div style="padding:12px 24px;border-top:1px solid var(--sa-border);display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:.8rem;color:var(--sa-text-muted)" id="sucursalesCount"></span>
                 <button class="btn-primary" onclick="mostrarFormSucursal()">
                     <i class="fas fa-plus"></i> Nueva sucursal
                 </button>
             </div>
             <div id="formSucursalWrap" style="display:none;padding:0 24px 20px">
-                <div style="border-top:1px solid #e2e8f0;padding-top:16px">
-                    <p style="font-size:.85rem;font-weight:700;color:#1e293b;margin-bottom:14px">
+                <div style="border-top:1px solid var(--sa-border);padding-top:16px">
+                    <p style="font-size:.85rem;font-weight:700;color:var(--sa-text);margin-bottom:14px">
                         <i class="fas fa-plus-circle" style="color:#6366f1;margin-right:6px"></i>Nueva sucursal
                     </p>
                     <div class="grid2">
@@ -685,15 +734,15 @@ requireAuth($required_roles);
             <div style="padding:16px 24px 0">
                 <div id="usuariosLista"></div>
             </div>
-            <div style="padding:12px 24px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center">
-                <span style="font-size:.8rem;color:#64748b" id="usuariosCount"></span>
+            <div style="padding:12px 24px;border-top:1px solid var(--sa-border);display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:.8rem;color:var(--sa-text-muted)" id="usuariosCount"></span>
                 <button class="btn-primary" onclick="mostrarFormUsuario()">
                     <i class="fas fa-user-plus"></i> Nuevo usuario
                 </button>
             </div>
             <div id="formUsuarioWrap" style="display:none;padding:0 24px 20px">
-                <div style="border-top:1px solid #e2e8f0;padding-top:16px">
-                    <p style="font-size:.85rem;font-weight:700;color:#1e293b;margin-bottom:14px">
+                <div style="border-top:1px solid var(--sa-border);padding-top:16px">
+                    <p style="font-size:.85rem;font-weight:700;color:var(--sa-text);margin-bottom:14px">
                         <i class="fas fa-user-plus" style="color:#6366f1;margin-right:6px"></i>
                         <span id="formUsuarioTitulo">Nuevo usuario</span>
                     </p>
@@ -707,7 +756,7 @@ requireAuth($required_roles);
                         <div class="form-group"><label id="uPassLabel">Contraseña *</label><input type="password" id="uPassword" placeholder="Mínimo 4 caracteres" autocomplete="new-password"></div>
                     </div>
                     <div class="form-group">
-                        <label>Correo electrónico <span style="font-weight:400;color:#94a3b8">(para recuperación de contraseña)</span></label>
+                        <label>Correo electrónico <span style="font-weight:400;color:var(--sa-text-light)">(para recuperación de contraseña)</span></label>
                         <input type="email" id="uEmail" placeholder="correo@ejemplo.com" autocomplete="off">
                     </div>
                     <div class="form-group">
@@ -738,7 +787,7 @@ requireAuth($required_roles);
         </div>
 
         <!-- Tabs -->
-        <div style="display:flex;border-bottom:1px solid #e2e8f0;padding:0 24px">
+        <div style="display:flex;border-bottom:1px solid var(--sa-border);padding:0 24px">
             <button class="tab-btn active" id="tabDatos"     onclick="switchPerfilTab('datos')">
                 <i class="fas fa-id-card"></i> Datos personales
             </button>
@@ -767,7 +816,7 @@ requireAuth($required_roles);
                 <input type="text" id="pUsername" placeholder="superadmin" autocomplete="off">
             </div>
             <div class="form-group">
-                <label>Correo electrónico <span style="font-weight:400;color:#94a3b8">(recuperación de contraseña)</span></label>
+                <label>Correo electrónico <span style="font-weight:400;color:var(--sa-text-light)">(recuperación de contraseña)</span></label>
                 <input type="email" id="pEmail" placeholder="correo@ejemplo.com">
             </div>
             <div style="text-align:right;margin-top:4px">
@@ -782,7 +831,7 @@ requireAuth($required_roles);
                 <label>Contraseña actual *</label>
                 <div style="position:relative">
                     <input type="password" id="pPassActual" placeholder="••••••••" autocomplete="current-password" style="padding-right:38px">
-                    <button type="button" onclick="togglePerfilPass('pPassActual','icoActual')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#94a3b8;padding:2px">
+                    <button type="button" onclick="togglePerfilPass('pPassActual','icoActual')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--sa-text-light);padding:2px">
                         <i class="fas fa-eye" id="icoActual"></i>
                     </button>
                 </div>
@@ -791,7 +840,7 @@ requireAuth($required_roles);
                 <label>Nueva contraseña *</label>
                 <div style="position:relative">
                     <input type="password" id="pPassNueva" placeholder="Mínimo 4 caracteres" autocomplete="new-password" style="padding-right:38px">
-                    <button type="button" onclick="togglePerfilPass('pPassNueva','icoNueva')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#94a3b8;padding:2px">
+                    <button type="button" onclick="togglePerfilPass('pPassNueva','icoNueva')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--sa-text-light);padding:2px">
                         <i class="fas fa-eye" id="icoNueva"></i>
                     </button>
                 </div>
@@ -800,7 +849,7 @@ requireAuth($required_roles);
                 <label>Confirmar nueva contraseña *</label>
                 <div style="position:relative">
                     <input type="password" id="pPassConfirm" placeholder="••••••••" autocomplete="new-password" style="padding-right:38px">
-                    <button type="button" onclick="togglePerfilPass('pPassConfirm','icoConfirm')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#94a3b8;padding:2px">
+                    <button type="button" onclick="togglePerfilPass('pPassConfirm','icoConfirm')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--sa-text-light);padding:2px">
                         <i class="fas fa-eye" id="icoConfirm"></i>
                     </button>
                 </div>
@@ -841,6 +890,28 @@ function toast(msg, tipo = 'ok') {
 
 function cerrarModal(id) {
     document.getElementById(id).classList.remove('active');
+}
+
+// ---- Modo oscuro (preferencia personal del superadmin) ----
+async function aplicarTema(temaOscuro) {
+    const sw = document.getElementById('tema-switch');
+    sw.disabled = true;
+    try {
+        const r = await fetch(`${API}?action=tema_guardar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tema_oscuro: temaOscuro }),
+        });
+        const d = await r.json();
+        if (d.error) { toast(d.message, 'err'); sw.checked = !temaOscuro; return; }
+        document.documentElement.setAttribute('data-theme', temaOscuro ? 'dark' : 'light');
+        toast(temaOscuro ? 'Modo oscuro activado' : 'Modo claro activado');
+    } catch {
+        toast('Error de conexión', 'err');
+        sw.checked = !temaOscuro;
+    } finally {
+        sw.disabled = false;
+    }
 }
 
 function planBadge(plan) {
@@ -893,8 +964,8 @@ function renderTenants() {
         <tr class="clickable-row" onclick="irEmpresa(${t.id})">
             <td style="text-align:center;padding:6px 12px">
                 ${t.logo
-                    ? `<img src="../../${escHtml(t.logo)}" alt="logo" style="width:40px;height:40px;object-fit:contain;border-radius:6px;border:1px solid #e2e8f0">`
-                    : `<div style="width:40px;height:40px;border-radius:6px;border:1px dashed #cbd5e1;display:inline-flex;align-items:center;justify-content:center;color:#cbd5e1"><i class="fas fa-image"></i></div>`}
+                    ? `<img src="../../${escHtml(t.logo)}" alt="logo" style="width:40px;height:40px;object-fit:contain;border-radius:6px;border:1px solid var(--sa-border)">`
+                    : `<div style="width:40px;height:40px;border-radius:6px;border:1px dashed var(--sa-text-light);display:inline-flex;align-items:center;justify-content:center;color:var(--sa-text-light)"><i class="fas fa-image"></i></div>`}
             </td>
             <td class="td-main">${escHtml(t.nombre)}</td>
             <td style="font-size:.8rem">
@@ -902,11 +973,11 @@ function renderTenants() {
                     ? `<span style="display:flex;align-items:center;gap:6px">
                         <span style="color:#6366f1;font-family:monospace">${escHtml(t.url)}</span>
                         <button onclick="event.stopPropagation();navigator.clipboard.writeText('${escHtml(t.url)}').then(()=>toast('URL copiada','ok'))"
-                                style="background:none;border:none;cursor:pointer;color:#94a3b8;padding:2px 4px" title="Copiar URL">
+                                style="background:none;border:none;cursor:pointer;color:var(--sa-text-light);padding:2px 4px" title="Copiar URL">
                             <i class="fas fa-copy"></i>
                         </button>
                        </span>`
-                    : '<span style="color:#cbd5e1">—</span>'}
+                    : '<span style="color:var(--sa-text-light)">—</span>'}
             </td>
             <td>${planBadge(t.plan)}</td>
             <td style="text-align:center">${t.total_sucursales ?? 0}</td>
@@ -916,7 +987,7 @@ function renderTenants() {
                     ${t.activo ? 'Activo' : 'Inactivo'}
                 </span>
             </td>
-            <td style="color:#64748b;font-size:.8rem">${fmtDate(t.created_at)}</td>
+            <td style="color:var(--sa-text-muted);font-size:.8rem">${fmtDate(t.created_at)}</td>
             <td>
                 <div style="display:flex;gap:6px">
                     <button class="btn-icon btn-edit" title="Editar empresa"
@@ -1084,7 +1155,7 @@ function switchTab(tab) {
 
 async function cargarSucursales(tenantId) {
     document.getElementById('sucursalesLista').innerHTML =
-        '<p style="padding:24px;text-align:center;color:#64748b"><i class="fas fa-spinner fa-spin"></i> Cargando...</p>';
+        '<p style="padding:24px;text-align:center;color:var(--sa-text-muted)"><i class="fas fa-spinner fa-spin"></i> Cargando...</p>';
     try {
         const r = await fetch(`${API}?action=sucursales_listar&tenant_id=${tenantId}`);
         const lista = await r.json();
@@ -1093,23 +1164,23 @@ async function cargarSucursales(tenantId) {
 
         if (!lista.length) {
             document.getElementById('sucursalesLista').innerHTML =
-                '<div style="padding:32px;text-align:center;color:#94a3b8"><i class="fas fa-store" style="font-size:2rem;display:block;margin-bottom:10px"></i>No hay sucursales</div>';
+                '<div style="padding:32px;text-align:center;color:var(--sa-text-light)"><i class="fas fa-store" style="font-size:2rem;display:block;margin-bottom:10px"></i>No hay sucursales</div>';
             return;
         }
         document.getElementById('sucursalesLista').innerHTML = `
         <table style="width:100%;border-collapse:collapse">
-            <thead><tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0">
-                <th style="padding:9px 14px;font-size:.72rem;font-weight:700;text-transform:uppercase;color:#64748b;text-align:left">Nombre</th>
-                <th style="padding:9px 14px;font-size:.72rem;font-weight:700;text-transform:uppercase;color:#64748b;text-align:left">Schema</th>
-                <th style="padding:9px 14px;font-size:.72rem;font-weight:700;text-transform:uppercase;color:#64748b;text-align:center">Usuarios</th>
-                <th style="padding:9px 14px;font-size:.72rem;font-weight:700;text-transform:uppercase;color:#64748b;text-align:left">Estado</th>
+            <thead><tr style="background:var(--sa-surface-2);border-bottom:1px solid var(--sa-border)">
+                <th style="padding:9px 14px;font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--sa-text-muted);text-align:left">Nombre</th>
+                <th style="padding:9px 14px;font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--sa-text-muted);text-align:left">Schema</th>
+                <th style="padding:9px 14px;font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--sa-text-muted);text-align:center">Usuarios</th>
+                <th style="padding:9px 14px;font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--sa-text-muted);text-align:left">Estado</th>
                 <th style="padding:9px 14px"></th>
             </tr></thead>
             <tbody>${lista.map(s => `
-            <tr style="border-bottom:1px solid #f1f5f9" id="srow-${s.id}">
-                <td style="padding:10px 14px;font-weight:600;color:#1e293b;font-size:.88rem">${escHtml(s.nombre)}</td>
-                <td style="padding:10px 14px;font-family:monospace;font-size:.76rem;color:#64748b">${escHtml(s.schema_name)}</td>
-                <td style="padding:10px 14px;text-align:center;color:#475569;font-size:.88rem">${s.total_usuarios}</td>
+            <tr style="border-bottom:1px solid var(--sa-bg)" id="srow-${s.id}">
+                <td style="padding:10px 14px;font-weight:600;color:var(--sa-text);font-size:.88rem">${escHtml(s.nombre)}</td>
+                <td style="padding:10px 14px;font-family:monospace;font-size:.76rem;color:var(--sa-text-muted)">${escHtml(s.schema_name)}</td>
+                <td style="padding:10px 14px;text-align:center;color:var(--sa-text-secondary);font-size:.88rem">${s.total_usuarios}</td>
                 <td style="padding:10px 14px">
                     <span style="padding:2px 9px;border-radius:20px;font-size:.7rem;font-weight:700;text-transform:uppercase;
                         background:${s.activo ? '#dcfce7' : '#fee2e2'};color:${s.activo ? '#16a34a' : '#dc2626'}">
@@ -1128,15 +1199,15 @@ async function cargarSucursales(tenantId) {
                     </div>
                 </td>
             </tr>
-            <tr id="sedit-${s.id}" style="display:none;background:#f8fafc">
+            <tr id="sedit-${s.id}" style="display:none;background:var(--sa-surface-2)">
                 <td colspan="5" style="padding:12px 14px">
                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:end">
-                        <div><label style="font-size:.72rem;font-weight:600;color:#64748b;text-transform:uppercase;display:block;margin-bottom:4px">Nombre</label>
-                            <input type="text" id="se-nombre-${s.id}" value="${escHtml(s.nombre)}" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:.85rem;color:#1e293b"></div>
-                        <div><label style="font-size:.72rem;font-weight:600;color:#64748b;text-transform:uppercase;display:block;margin-bottom:4px">Dirección</label>
-                            <input type="text" id="se-dir-${s.id}" value="${escHtml(s.direccion||'')}" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:.85rem;color:#1e293b"></div>
-                        <div><label style="font-size:.72rem;font-weight:600;color:#64748b;text-transform:uppercase;display:block;margin-bottom:4px">Teléfono</label>
-                            <input type="text" id="se-tel-${s.id}" value="${escHtml(s.telefono||'')}" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:.85rem;color:#1e293b"></div>
+                        <div><label style="font-size:.72rem;font-weight:600;color:var(--sa-text-muted);text-transform:uppercase;display:block;margin-bottom:4px">Nombre</label>
+                            <input type="text" id="se-nombre-${s.id}" value="${escHtml(s.nombre)}" style="width:100%;padding:8px 10px;border:1.5px solid var(--sa-border);border-radius:7px;font-size:.85rem;color:var(--sa-text)"></div>
+                        <div><label style="font-size:.72rem;font-weight:600;color:var(--sa-text-muted);text-transform:uppercase;display:block;margin-bottom:4px">Dirección</label>
+                            <input type="text" id="se-dir-${s.id}" value="${escHtml(s.direccion||'')}" style="width:100%;padding:8px 10px;border:1.5px solid var(--sa-border);border-radius:7px;font-size:.85rem;color:var(--sa-text)"></div>
+                        <div><label style="font-size:.72rem;font-weight:600;color:var(--sa-text-muted);text-transform:uppercase;display:block;margin-bottom:4px">Teléfono</label>
+                            <input type="text" id="se-tel-${s.id}" value="${escHtml(s.telefono||'')}" style="width:100%;padding:8px 10px;border:1.5px solid var(--sa-border);border-radius:7px;font-size:.85rem;color:var(--sa-text)"></div>
                         <div style="display:flex;gap:6px">
                             <button class="btn-primary" style="padding:8px 14px;font-size:.82rem" onclick="guardarSucursal(${s.id})"><i class="fas fa-check"></i></button>
                             <button class="btn-cancel" style="padding:8px 12px;font-size:.82rem" onclick="document.getElementById('sedit-${s.id}').style.display='none'"><i class="fas fa-times"></i></button>
@@ -1220,7 +1291,7 @@ async function toggleSucursal(id) {
 
 async function cargarUsuarios(tenantId) {
     document.getElementById('usuariosLista').innerHTML =
-        '<p style="padding:24px;text-align:center;color:#64748b"><i class="fas fa-spinner fa-spin"></i> Cargando...</p>';
+        '<p style="padding:24px;text-align:center;color:var(--sa-text-muted)"><i class="fas fa-spinner fa-spin"></i> Cargando...</p>';
     try {
         const r = await fetch(`${API}?action=usuarios_listar&tenant_id=${tenantId}`);
         const lista = await r.json();
@@ -1229,27 +1300,27 @@ async function cargarUsuarios(tenantId) {
 
         if (!lista.length) {
             document.getElementById('usuariosLista').innerHTML =
-                '<div style="padding:32px;text-align:center;color:#94a3b8"><i class="fas fa-users" style="font-size:2rem;display:block;margin-bottom:10px"></i>No hay usuarios</div>';
+                '<div style="padding:32px;text-align:center;color:var(--sa-text-light)"><i class="fas fa-users" style="font-size:2rem;display:block;margin-bottom:10px"></i>No hay usuarios</div>';
             return;
         }
         document.getElementById('usuariosLista').innerHTML = `
         <table style="width:100%;border-collapse:collapse">
-            <thead><tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0">
-                <th style="padding:9px 14px;font-size:.72rem;font-weight:700;text-transform:uppercase;color:#64748b;text-align:left">Nombre</th>
-                <th style="padding:9px 14px;font-size:.72rem;font-weight:700;text-transform:uppercase;color:#64748b;text-align:left">Usuario</th>
-                <th style="padding:9px 14px;font-size:.72rem;font-weight:700;text-transform:uppercase;color:#64748b;text-align:left">Accesos</th>
-                <th style="padding:9px 14px;font-size:.72rem;font-weight:700;text-transform:uppercase;color:#64748b;text-align:left">Estado</th>
+            <thead><tr style="background:var(--sa-surface-2);border-bottom:1px solid var(--sa-border)">
+                <th style="padding:9px 14px;font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--sa-text-muted);text-align:left">Nombre</th>
+                <th style="padding:9px 14px;font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--sa-text-muted);text-align:left">Usuario</th>
+                <th style="padding:9px 14px;font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--sa-text-muted);text-align:left">Accesos</th>
+                <th style="padding:9px 14px;font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--sa-text-muted);text-align:left">Estado</th>
                 <th style="padding:9px 14px"></th>
             </tr></thead>
             <tbody>${lista.map(u => {
                 const accesos = typeof u.accesos === 'string' ? JSON.parse(u.accesos) : (u.accesos || []);
                 const accesoText = accesos.length
                     ? accesos.map(a => `<span style="display:inline-block;padding:1px 7px;border-radius:12px;font-size:.68rem;background:#eef2ff;color:#4f46e5;margin:1px">${escHtml(a.sucursal)} <span style="opacity:.7">${a.rol}</span></span>`).join(' ')
-                    : '<span style="color:#94a3b8;font-size:.78rem">Sin asignar</span>';
+                    : '<span style="color:var(--sa-text-light);font-size:.78rem">Sin asignar</span>';
                 return `
-            <tr style="border-bottom:1px solid #f1f5f9" id="urow-${u.id}">
-                <td style="padding:10px 14px;font-weight:600;color:#1e293b;font-size:.88rem">${escHtml(u.nombre)} ${escHtml(u.apellido||'')}</td>
-                <td style="padding:10px 14px;font-family:monospace;font-size:.82rem;color:#475569">${escHtml(u.username)}</td>
+            <tr style="border-bottom:1px solid var(--sa-bg)" id="urow-${u.id}">
+                <td style="padding:10px 14px;font-weight:600;color:var(--sa-text);font-size:.88rem">${escHtml(u.nombre)} ${escHtml(u.apellido||'')}</td>
+                <td style="padding:10px 14px;font-family:monospace;font-size:.82rem;color:var(--sa-text-secondary)">${escHtml(u.username)}</td>
                 <td style="padding:10px 14px">${accesoText}</td>
                 <td style="padding:10px 14px">
                     <span style="padding:2px 9px;border-radius:20px;font-size:.7rem;font-weight:700;text-transform:uppercase;

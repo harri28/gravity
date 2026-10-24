@@ -19,7 +19,7 @@ define('MAIL_PORT',      587);
 define('MAIL_USERNAME',  'tu_correo@gmail.com');
 define('MAIL_PASSWORD',  'xxxx xxxx xxxx xxxx');
 define('MAIL_FROM',      'tu_correo@gmail.com');
-define('MAIL_FROM_NAME', 'FarmaSystem');
+define('MAIL_FROM_NAME', 'Gravity');
 
 /**
  * Envía un correo HTML vía SMTP con STARTTLS.

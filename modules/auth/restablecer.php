@@ -100,7 +100,9 @@ $nombre = htmlspecialchars($reset['nombre'] ?? '');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nueva contraseña — FarmaSystem</title>
+    <title>Nueva contraseña — Gravity</title>
+    <link rel="icon" type="image/svg+xml" href="../../assets/img/logos/favicon.svg">
+    <link rel="icon" type="image/png" href="../../assets/img/logos/favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -168,7 +170,7 @@ $nombre = htmlspecialchars($reset['nombre'] ?? '');
 <div class="card">
     <div class="card-header">
         <div class="brand-icon"><i class="fas fa-lock-open"></i></div>
-        <div class="brand-name">FarmaSystem</div>
+        <div class="brand-name">Gravity</div>
         <div class="brand-sub">Nueva contraseña</div>
     </div>
     <div class="card-body">
@@ -238,7 +240,7 @@ $nombre = htmlspecialchars($reset['nombre'] ?? '');
         <?php endif; ?>
 
     </div>
-    <div class="card-footer">FarmaSystem &copy; <?= date('Y') ?> · v1.0</div>
+    <div class="card-footer">Gravity &copy; <?= date('Y') ?> · v1.0</div>
 </div>
 <script>
 function togglePass(inputId, iconId) {

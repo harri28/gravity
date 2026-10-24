@@ -4,9 +4,9 @@
    ============================================================ */
 
 :root {
-    --primary:        #2563EB;
-    --primary-light:  #EFF6FF;
-    --primary-dark:   #1D4ED8;
+    --primary:        #0471CD;
+    --primary-light:  #E6EFFF;
+    --primary-dark:   #02386B;
     --success:        #16A34A;
     --success-light:  #F0FDF4;
     --warning:        #D97706;
@@ -35,24 +35,28 @@
     --transition:     .18s ease;
 }
 
-/* Modo oscuro (activado desde Admin > Configuración, aplica a todo el tenant) */
+/* Modo oscuro (activado desde Admin > Configuración, aplica a todo el tenant).
+   Paleta "Gravity" — derivada de la imagen del pozo gravitatorio del brand:
+   negro casi puro de fondo + navy profundo + azul brillante como acento. */
 :root[data-theme="dark"] {
-    --primary-light:  #1E293B;
+    --primary:        #0471CD;
+    --primary-light:  #0A1A3A;
+    --primary-dark:   #02386B;
     --success-light:  #0F2A1A;
     --warning-light:  #2B2109;
     --danger-light:   #2E1315;
     --info-light:     #082B33;
-    --bg:             #0B1220;
-    --surface:        #111827;
-    --surface-2:      #1A2333;
-    --border:         #2A3547;
-    --border-light:   #1F2937;
-    --text:           #E5E7EB;
-    --text-muted:     #94A3B8;
-    --text-light:     #64748B;
-    --shadow:         0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
-    --shadow-md:      0 4px 12px rgba(0,0,0,.45);
-    --shadow-lg:      0 10px 30px rgba(0,0,0,.55);
+    --bg:             #030308;
+    --surface:        #0A1226;
+    --surface-2:      #0F1D3A;
+    --border:         #1A2D55;
+    --border-light:   #11213F;
+    --text:           #E6EEFF;
+    --text-muted:     #8AA0C7;
+    --text-light:     #4F6690;
+    --shadow:         0 1px 3px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.4);
+    --shadow-md:      0 4px 12px rgba(0,0,0,.55);
+    --shadow-lg:      0 10px 30px rgba(0,0,0,.7);
 }
 
 /* Impresion: siempre en fondo blanco, sin importar el modo oscuro.
@@ -61,7 +65,7 @@
    bloquea ese popup e imprimen la pagina de fondo con Ctrl+P. */
 @media print {
     :root, :root[data-theme="dark"] {
-        --primary-light:  #EFF6FF;
+        --primary-light:  #E6EFFF;
         --success-light:  #F0FDF4;
         --warning-light:  #FFFBEB;
         --danger-light:   #FEF2F2;
@@ -365,7 +369,7 @@ input, select, textarea { font-family: var(--font); }
     background: var(--surface); transition: border-color var(--transition), box-shadow var(--transition); outline: none;
     appearance: auto; /* Restore native select arrow removed by Bootstrap */
 }
-.form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+.form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(4,113,205,.1); }
 .form-control::placeholder { color: var(--text-light); }
 .input-group { position: relative; }
 .input-group .form-control { padding-left: 36px; }
@@ -494,13 +498,13 @@ tbody tr:last-child td { border-bottom: none; }
     color: var(--text-light); cursor: pointer; font-size: .8rem; padding: 7px 18px;
     display: inline-flex; align-items: center; gap: 6px; transition: all var(--transition);
 }
-.btn-ver-todos:hover { border-color: var(--primary); color: var(--primary); background: rgba(37,99,235,.05); }
+.btn-ver-todos:hover { border-color: var(--primary); color: var(--primary); background: rgba(4,113,205,.05); }
 .product-card {
     background: var(--surface); border: 1.5px solid var(--border);
     border-radius: var(--radius); padding: 14px 12px; cursor: pointer;
     transition: all var(--transition); display: flex; flex-direction: column; gap: 5px; position: relative;
 }
-.product-card:hover { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(37,99,235,.1); transform: translateY(-1px); }
+.product-card:hover { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(4,113,205,.1); transform: translateY(-1px); }
 .product-card.low-stock { border-color: var(--warning); }
 .product-card.out-stock { opacity: .5; cursor: not-allowed; pointer-events: none; }
 .product-card.en-conteo { border-color: var(--warning); background: rgba(245,158,11,.06); opacity: .75; cursor: not-allowed; }
@@ -865,4 +869,20 @@ tbody tr:last-child td { border-bottom: none; }
 @media (max-width: 380px) {
     .page-title { font-size: 1rem; }
     .btn { padding: 8px 14px; font-size: .82rem; }
+}
+
+/* ============================================================
+   Esconder las flechas spinner de los <input type="number">
+   (son feas, inconsistentes entre navegadores y no suman valor
+   en forms del sistema). El usuario sigue pudiendo tipear el
+   numero o usar las flechas del teclado.
+   ============================================================ */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
 }
