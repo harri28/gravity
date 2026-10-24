@@ -71,6 +71,7 @@ $_tema_oscuro = in_array($_brand['tema_oscuro'] ?? false, [true, 't', 1, '1'], t
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="<?= $base_path ?? '' ?>assets/css/style.css?v=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
     <script src="<?= $base_path ?? '' ?>assets/js/barcode-scanner.js"></script>
+    <script src="<?= $base_path ?? '' ?>assets/js/app-dialog.js?v=<?= @filemtime(__DIR__ . '/../assets/js/app-dialog.js') ?: 1 ?>"></script>
     <style>
         :root { --primary: <?= htmlspecialchars($_suc_color) ?>; }
         /* Rol badge en sidebar */
@@ -318,13 +319,13 @@ $_tema_oscuro = in_array($_brand['tema_oscuro'] ?? false, [true, 't', 1, '1'], t
         fetch(_bp + 'modules/admin/api.php?action=logo_subir', { method: 'POST', body: form })
             .then(r => r.json())
             .then(data => {
-                if (data.error) { alert(data.message); return; }
+                if (data.error) { appAlert(data.message, { tipo: 'error' }); return; }
                 const img  = document.getElementById('sidebar-brand-logo');
                 const icon = document.getElementById('sidebar-brand-icon');
                 if (img)  { img.src = _bp + data.logo_path + '?t=' + Date.now(); img.style.display = ''; }
                 if (icon) { icon.style.display = 'none'; }
             })
-            .catch(() => alert('Error al subir logo'));
+            .catch(() => appAlert('Error al subir logo', { tipo: 'error' }));
         input.value = '';
     };
 })();

@@ -794,7 +794,13 @@ async function agregarAlComandaConUnidad(producto, unidadMedida, cantidad) {
 
 async function quitarItem(itemId) {
     if (accionEnCurso) return;
-    if (!confirm('¿Quitar este item de la comanda? El stock sera repuesto.')) return;
+    const ok = await appConfirm('¿Quitar este item de la comanda? El stock será repuesto.', {
+        titulo: 'Quitar item',
+        textoOk: 'Sí, quitar',
+        textoNo: 'Cancelar',
+        tipo: 'danger',
+    });
+    if (!ok) return;
     accionEnCurso = true;
     const d = await postJson(`${API}?action=comanda_quitar_item`, { item_id: itemId });
     accionEnCurso = false;
@@ -960,7 +966,11 @@ async function confirmarCobro() {
     }
 
     if (metodo === 'efectivo' && monto < total) {
-        if (!confirm(`El monto recibido (${soles(monto)}) es menor al total (${soles(total)}). ¿Confirmar igual?`)) return;
+        const ok = await appConfirm(
+            `El monto recibido (${soles(monto)}) es menor al total (${soles(total)}). ¿Confirmar igual?`,
+            { titulo: 'Monto insuficiente', textoOk: 'Confirmar', textoNo: 'Cancelar', tipo: 'warning' }
+        );
+        if (!ok) return;
     }
 
     const btn = document.getElementById('btn-confirmar-cobro');
