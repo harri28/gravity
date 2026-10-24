@@ -971,8 +971,12 @@ function cmPintarSerie() {
     const tipo = document.getElementById('cm-tipo-comp').value;
     const sel  = document.getElementById('cm-serie');
     const list = (_cmSeriesCache && _cmSeriesCache[tipo]) || [];
+    // El endpoint devuelve objetos {tipo, serie, ultimo_numero, ...}; tomamos .serie.
     sel.innerHTML = list.length
-        ? list.map(s => `<option value="${s}">${s}</option>`).join('')
+        ? list.map(s => {
+            const codigo = (s && typeof s === 'object') ? (s.serie || '') : String(s);
+            return `<option value="${codigo}">${codigo}</option>`;
+          }).join('')
         : '<option value="">—</option>';
 }
 
