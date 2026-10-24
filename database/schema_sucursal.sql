@@ -437,7 +437,8 @@ CREATE TABLE IF NOT EXISTS orden_compra_detalles (
     descripcion     VARCHAR(200),
     cantidad        DECIMAL(10,2) NOT NULL,
     precio_unitario DECIMAL(10,2) NOT NULL,
-    subtotal        DECIMAL(10,2) NOT NULL
+    subtotal        DECIMAL(10,2) NOT NULL,
+    unidad_medida   VARCHAR(50)
 );
 
 CREATE TABLE IF NOT EXISTS cuentas_por_pagar (

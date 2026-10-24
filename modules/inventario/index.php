@@ -178,7 +178,7 @@ include '../../includes/header.php';
                     <th>Nombre</th>
                     <th>Categoría</th>
                     <th class="text-right" style="padding-left:32px;min-width:110px">P. Venta</th>
-                    <th style="text-align:center;padding-left:32px;min-width:90px">Stock</th>
+                    <th style="text-align:center;padding-left:32px;min-width:110px;white-space:nowrap">Stock</th>
                     <th style="padding-left:32px;min-width:100px">Unidad</th>
                     <th class="text-right" style="padding-left:32px;min-width:80px">Mín.</th>
                 </tr>
@@ -1313,7 +1313,7 @@ function renderPage(page) {
             </td>
             <td>${p.categoria || '<span style="color:var(--text-light)">—</span>'}</td>
             <td class="text-right" style="font-weight:600;white-space:nowrap;padding-left:32px;min-width:110px">S/ ${parseFloat(p.precio_venta).toFixed(2)}</td>
-            <td style="text-align:center;padding-left:32px;min-width:90px">
+            <td style="text-align:center;padding-left:32px;min-width:110px;white-space:nowrap">
                 <span style="${stockCls}">${p.stock}</span>
                 ${stockBadge}
                 ${esAdmin ? `<button type="button" onclick='openAjusteModal(${JSON.stringify(p)})' title="Ajustar stock"
