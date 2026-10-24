@@ -1,5 +1,5 @@
 <?php
-// Detecta el tenant desde el subdominio (ej: generycpharma.genpharma.cloud ->
+// Detecta el tenant desde el subdominio (ej: generycpharma.gravityty.space ->
 // slug "generycpharma"). Usado por login.php (para el guard de host) y
 // api.php (para restringir el login a ese tenant). Requiere que $db ya
 // exista (getDB()) antes de incluir este archivo.

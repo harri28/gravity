@@ -6,7 +6,7 @@ $host = strtolower(
     preg_replace('/:\d+$/', '', $_SERVER['HTTP_HOST'] ?? '')
 );
 
-if ($host === 'admin.genpharma.cloud') {
+if ($host === 'admin.gravityty.space') {
     header('Location: /modules/superadmin/login.php');
     exit;
 }
