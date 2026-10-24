@@ -405,7 +405,8 @@ include '../../includes/header.php';
                     </div>
                     <div class="form-group" style="flex:1;margin-bottom:0">
                         <label class="form-label">SKU <span style="font-size:.78rem;color:var(--text-muted)">(código interno)</span></label>
-                        <input type="text" id="p-sku" class="form-control" placeholder="Ej: FAR-001">
+                        <input type="text" id="p-sku" class="form-control" placeholder="Déjalo vacío para autogenerar">
+                        <small style="color:var(--text-muted);font-size:.7rem">Si lo dejas vacío, el sistema genera uno a partir del nombre (ej. PILSEN CALLAO → PC001).</small>
                     </div>
                 </div>
 

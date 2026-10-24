@@ -129,6 +129,69 @@ function tomaInvGenerarCodigo(PDO $db): string
     return $prefijo . str_pad((string) ($ultimo + 1), 4, '0', STR_PAD_LEFT);
 }
 
+/**
+ * Genera un SKU automatico a partir del nombre del producto.
+ *
+ *   PILSEN CALLAO 630 ML   -> PC001
+ *   COCA COLA 600 ML       -> CC001
+ *   AGUA CIELO SIN GAS     -> ACS001   (SIN y CON se consideran significativos
+ *                                        porque distinguen variedades de agua)
+ *   PILSEN 630 ML          -> P001
+ *
+ * Reglas: toma la primera letra de hasta 3 palabras significativas del nombre
+ * (ignorando artículos, conectores vacíos y palabras que son solo medidas o
+ * numeros). Agrega un correlativo de 3 digitos basado en cuantos productos
+ * ya existen con ese mismo prefijo en el schema de la sucursal activa.
+ *
+ * Si ya hay un SKU numerado para el prefijo, se devuelve el siguiente libre.
+ */
+function generarSkuAutomatico(PDO $db, string $nombreProducto, ?int $excluirId = null): string
+{
+    // Normalizar a MAYUSCULAS, quitar puntuacion de puntos y comas
+    $normal = strtoupper(trim($nombreProducto));
+    $normal = str_replace(['.', ','], '', $normal);
+    if ($normal === '') $normal = 'PRD';
+
+    $ignorar = [
+        'DE','DEL','LA','EL','LAS','LOS','Y','E','O','U','A','EN','AL','SU','UN','UNA',
+        'ML','L','LT','LTS','G','GR','GRS','KG','OZ','CC','MG','CM','MM','MT',
+    ];
+    $palabras = preg_split('/\s+/', $normal);
+    $iniciales = '';
+    $contadas  = 0;
+    foreach ($palabras as $p) {
+        if ($p === '') continue;
+        if (ctype_digit($p)) continue;                              // "600", "630"
+        if (preg_match('/^\d+(ML|L|LT|LTS|G|GR|KG|OZ|CC|MG|CM|MM|MT)$/i', $p)) continue;  // "630ML"
+        if (in_array($p, $ignorar, true)) continue;
+        $iniciales .= $p[0];
+        if (++$contadas >= 3) break;
+    }
+    if ($iniciales === '') $iniciales = 'X';
+
+    // Buscar el ultimo correlativo que ya exista para este prefijo exacto
+    $sql = "SELECT codigo_interno FROM productos
+            WHERE codigo_interno ~ ('^' || :pfx || '[0-9]+$')";
+    $params = [':pfx' => $iniciales];
+    if ($excluirId !== null && $excluirId > 0) {
+        $sql .= " AND id != :exid";
+        $params[':exid'] = $excluirId;
+    }
+    $sql .= " ORDER BY LENGTH(codigo_interno) DESC, codigo_interno DESC LIMIT 1";
+
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+    $ultimo = $stmt->fetchColumn();
+
+    $siguiente = 1;
+    if ($ultimo) {
+        $num = (int) substr($ultimo, strlen($iniciales));
+        $siguiente = $num + 1;
+    }
+
+    return $iniciales . str_pad((string) $siguiente, 3, '0', STR_PAD_LEFT);
+}
+
 try {
 
 switch ($action) {
@@ -358,7 +421,12 @@ switch ($action) {
                  :p_compra, :p_venta, :stock, :stock_min, :receta, :favorito, TRUE, :fvenc)
             RETURNING id
         ");
-        $sku = trim($data['sku'] ?? '') ?: $codigo;
+        // SKU: si viene vacio, se genera automatico a partir del nombre
+        // (iniciales de hasta 3 palabras significativas + correlativo de 3 digitos).
+        $sku = trim($data['sku'] ?? '');
+        if ($sku === '') {
+            $sku = generarSkuAutomatico($db, trim($data['nombre']));
+        }
         $stmt->execute([
             ':codigo' => $codigo,
             ':codigo_interno' => $sku,
@@ -387,7 +455,7 @@ switch ($action) {
         if (!empty($data['precios_unidad']) && is_array($data['precios_unidad'])) {
             guardarPreciosUnidadProducto($db, $id, $data['precios_unidad']);
         }
-        jsonResponse(['error' => false, 'message' => 'Producto creado correctamente', 'id' => $id]);
+        jsonResponse(['error' => false, 'message' => 'Producto creado correctamente', 'id' => $id, 'sku' => $sku]);
 
     case 'actualizar':
         if (isCajero()) {
@@ -453,7 +521,13 @@ switch ($action) {
                 updated_at = NOW()
             WHERE id = :id
         ");
-        $sku = trim($data['sku'] ?? '') ?: $codigo;
+        // SKU: igual criterio que en 'crear' (si queda vacio se autogenera).
+        // Al editar, excluimos el propio producto del lookup para no quedar
+        // atrapados en el ultimo correlativo de el mismo.
+        $sku = trim($data['sku'] ?? '');
+        if ($sku === '') {
+            $sku = generarSkuAutomatico($db, trim($data['nombre']), $id);
+        }
         $stmt->execute([
             ':id' => $id,
             ':codigo' => $codigo,
