@@ -64,7 +64,7 @@ $__bgUrl = (function_exists('app_public_prefix') ? app_public_prefix() : '/gravi
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#02386b">
     <title>Panel de Control — Gravity</title>
-    <link rel="icon" type="image/svg+xml" href="../../assets/img/logos/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="../../assets/img/logos/favicon.svg?v=<?= @filemtime(__DIR__ . '/../../assets/img/logos/favicon.svg') ?: 1 ?>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">

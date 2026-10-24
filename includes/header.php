@@ -64,7 +64,7 @@ $_tema_oscuro = in_array($_brand['tema_oscuro'] ?? false, [true, 't', 1, '1'], t
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $page_title ?? $_brand_name ?></title>
-    <link rel="icon" type="image/svg+xml" href="<?= $base_path ?? '' ?>assets/img/logos/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="<?= $base_path ?? '' ?>assets/img/logos/favicon.svg?v=<?= @filemtime(__DIR__ . '/../assets/img/logos/favicon.svg') ?: 1 ?>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
