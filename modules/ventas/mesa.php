@@ -891,6 +891,12 @@ async function quitarItem(itemId) {
     accionEnCurso = false;
     if (d.error) { showToast(d.message, 'error'); return; }
     showToast(d.message, 'success');
+    if (d.comanda_cerrada) {
+        // Era el ultimo item: la comanda se auto-cerro para liberar la mesa.
+        // Volvemos al grid para que se vea como libre y el cronometro parta de 0.
+        setTimeout(() => { window.location = 'index.php'; }, 600);
+        return;
+    }
     await Promise.all([cargarComanda(), cargarProductos()]);
 }
 

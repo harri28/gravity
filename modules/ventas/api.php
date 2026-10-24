@@ -847,8 +847,24 @@ switch ($action) {
             $db->prepare("UPDATE comandas SET total = COALESCE((SELECT SUM(subtotal) FROM comanda_items WHERE comanda_id = :c), 0) WHERE id = :c")
                 ->execute([':c' => $item['comanda_id']]);
 
+            // Si fue el ultimo item, cerrar la comanda (anulada) para que la mesa
+            // vuelva a aparecer libre y el cronometro arranque de cero la proxima
+            // apertura. Evita que una comanda "fantasma" de 0 items siga ocupando
+            // la mesa indefinidamente.
+            $cntSt = $db->prepare("SELECT COUNT(*) FROM comanda_items WHERE comanda_id = :c");
+            $cntSt->execute([':c' => $item['comanda_id']]);
+            $comandaVaciada = ((int)$cntSt->fetchColumn()) === 0;
+            if ($comandaVaciada) {
+                $db->prepare("UPDATE comandas SET estado='anulada', hora_cierre=NOW(), motivo_anulacion='Comanda vaciada (ultimo item removido)' WHERE id = :c")
+                    ->execute([':c' => $item['comanda_id']]);
+            }
+
             $db->commit();
-            jsonResponse(['error' => false, 'message' => 'Item eliminado']);
+            jsonResponse([
+                'error'            => false,
+                'message'          => 'Item eliminado',
+                'comanda_cerrada'  => $comandaVaciada,
+            ]);
         } catch (Exception $e) {
             if ($db->inTransaction()) $db->rollBack();
             jsonResponse(['error' => true, 'message' => 'Error al quitar item: ' . $e->getMessage()], 500);
