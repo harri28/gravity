@@ -321,7 +321,7 @@ function renderMesa(m) {
             <div class="mesa-card ${cls}" onclick="${onclick}">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
                     <div>
-                        <div class="mesa-numero">#${escH(m.numero)}</div>
+                        <div class="mesa-numero">${escH(m.numero)}</div>
                         <div class="mesa-nombre">${nombre}</div>
                     </div>
                     <span class="mesa-estado-pill"><i class="fas fa-circle" style="font-size:.5rem"></i> Ocupada</span>
@@ -340,7 +340,7 @@ function renderMesa(m) {
         <div class="mesa-card ${cls}" onclick="${onclick}">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
                 <div>
-                    <div class="mesa-numero">#${escH(m.numero)}</div>
+                    <div class="mesa-numero">${escH(m.numero)}</div>
                     <div class="mesa-nombre">${nombre || '&nbsp;'}</div>
                 </div>
                 <span class="mesa-estado-pill"><i class="fas fa-circle" style="font-size:.5rem"></i> Libre</span>
