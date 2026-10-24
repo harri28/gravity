@@ -447,12 +447,12 @@ switch ($action) {
             $db->exec("CREATE SCHEMA IF NOT EXISTS \"{$schema}\"");
             $db->exec("SET search_path TO \"{$schema}\", public");
 
+            // Ejecutar el archivo completo en un solo exec: PDO_PGSQL soporta
+            // multi-statement nativo. Partir por ';' rompe los bloques
+            // DO $$ ... $$; (tienen ';' internos) y provoca "unterminated
+            // dollar-quoted string".
             $sql_raw = file_get_contents($sql_file);
-            // Eliminar comentarios de línea para evitar fragmentos vacíos
-            $sql_raw = preg_replace('/--[^\n]*/', '', $sql_raw);
-            foreach (array_filter(array_map('trim', explode(';', $sql_raw))) as $stmt_sql) {
-                $db->exec($stmt_sql);
-            }
+            $db->exec($sql_raw);
             $db->exec("SET search_path TO public");
 
             // ---- Registrar en public.sucursales (transacción solo para el INSERT) ----
