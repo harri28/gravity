@@ -148,6 +148,33 @@ include '../../includes/header.php';
 </div>
 
 <!-- ======================================================
+     MODAL: Elegir unidad de medida (CAJA, PACK, etc.)
+     Se abre al agregar un producto que tiene presentaciones alternativas
+     en producto_precios_unidad. Mismo flujo que el POS directo.
+     ====================================================== -->
+<div class="modal-overlay" id="modal-unidad-mesa">
+    <div class="modal" style="max-width:420px">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="fas fa-boxes" style="color:var(--primary);margin-right:8px"></i>
+                Unidad de venta
+            </h3>
+            <button class="modal-close" onclick="closeModal('modal-unidad-mesa')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div style="margin-bottom:14px">
+                <div style="font-size:.78rem;color:var(--text-muted)">Producto</div>
+                <div id="unidad-mesa-producto-nombre" style="font-weight:700;font-size:1rem;color:var(--text)">—</div>
+            </div>
+            <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:10px">
+                ¿Cómo lo vas a cargar a la comanda?
+            </div>
+            <div id="unidad-mesa-opciones"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================================
      MODAL: Cobrar
      ====================================================== -->
 <div class="modal-overlay" id="modal-cobrar">
@@ -651,7 +678,7 @@ async function agregarProducto(productoId, cantidad = 1) {
     }
 
     try {
-        const r = await fetch(`${BASE}modules/inventario/api.php?action=precios_unidad_listar&producto_id=${productoId}`);
+        const r = await fetch(`../inventario/api.php?action=precios_unidad_listar&producto_id=${productoId}`);
         const data = await r.json();
         _presentacionesCacheMesa[productoId] = Array.isArray(data) ? data : [];
         return continuarAgregarAlComanda(producto, _presentacionesCacheMesa[productoId], cantidad);

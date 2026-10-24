@@ -688,7 +688,7 @@ switch ($action) {
 
         $itSt = $db->prepare("
             SELECT ci.id, ci.producto_id, ci.cantidad, ci.precio_unitario, ci.subtotal,
-                   ci.hora_pedido, ci.notas,
+                   ci.hora_pedido, ci.notas, ci.unidad_medida, COALESCE(ci.factor_unidad, 1) AS factor_unidad,
                    p.nombre AS producto_nombre, p.codigo, p.product_type,
                    u.nombre AS mozo_nombre
             FROM comanda_items ci
@@ -715,6 +715,10 @@ switch ($action) {
         $cantidad   = (float)($d['cantidad'] ?? 1);
         if ($cantidad <= 0) $cantidad = 1;
         $notas      = trim($d['notas'] ?? '');
+        // Si viene unidad_medida, el item representa una presentacion alternativa
+        // (ej. "CAJA" = 12 unidades a precio propio). Se busca en producto_precios_unidad.
+        $unidadMedida = isset($d['unidad_medida']) ? trim((string)$d['unidad_medida']) : '';
+        if ($unidadMedida === '') $unidadMedida = null;
 
         if (!$comandaId || !$productoId) {
             jsonResponse(['error' => true, 'message' => 'Datos incompletos'], 400);
@@ -738,18 +742,35 @@ switch ($action) {
                 jsonResponse(['error' => true, 'message' => 'Producto no encontrado o inactivo'], 404);
             }
 
-            $esService = (($prod['product_type'] ?? 'product') === 'service');
-            if (!$esService && (float)$prod['stock'] < $cantidad) {
+            // Resolver precio/factor segun unidad elegida. Si no vino unidad_medida,
+            // es la unidad base (factor 1, precio del producto).
+            $precio = (float)$prod['precio_venta'];
+            $factor = 1.0;
+            if ($unidadMedida !== null) {
+                $pres = $db->prepare("SELECT cantidad, precio_venta FROM producto_precios_unidad WHERE producto_id = :pid AND unidad_medida = :um LIMIT 1");
+                $pres->execute([':pid' => $productoId, ':um' => $unidadMedida]);
+                $presRow = $pres->fetch();
+                if (!$presRow) {
+                    $db->rollBack();
+                    jsonResponse(['error' => true, 'message' => "Presentacion '{$unidadMedida}' no existe para este producto"], 400);
+                }
+                $precio = (float)$presRow['precio_venta'];
+                $factor = (float)$presRow['cantidad'];
+                if ($factor <= 0) $factor = 1.0;
+            }
+
+            $esService    = (($prod['product_type'] ?? 'product') === 'service');
+            $stockDescuento = $cantidad * $factor;  // unidades base a descontar
+            if (!$esService && (float)$prod['stock'] < $stockDescuento) {
                 $db->rollBack();
                 jsonResponse(['error' => true, 'message' => "Sin stock de {$prod['nombre']} (disponible: " . rtrim(rtrim((string)$prod['stock'], '0'), '.') . ')'], 400);
             }
 
-            $precio   = (float)$prod['precio_venta'];
             $subtotal = $precio * $cantidad;
 
             $ins = $db->prepare("
-                INSERT INTO comanda_items (comanda_id, producto_id, cantidad, precio_unitario, subtotal, usuario_id, notas)
-                VALUES (:c, :p, :q, :pr, :s, :u, :n)
+                INSERT INTO comanda_items (comanda_id, producto_id, cantidad, precio_unitario, subtotal, usuario_id, notas, unidad_medida, factor_unidad)
+                VALUES (:c, :p, :q, :pr, :s, :u, :n, :um, :f)
                 RETURNING id, hora_pedido
             ");
             $ins->execute([
@@ -757,12 +778,14 @@ switch ($action) {
                 ':q' => $cantidad, ':pr' => $precio, ':s' => $subtotal,
                 ':u' => sesionId(),
                 ':n' => $notas !== '' ? $notas : null,
+                ':um' => $unidadMedida,
+                ':f' => $factor,
             ]);
             $itemRow = $ins->fetch();
 
             if (!$esService) {
                 $db->prepare("UPDATE productos SET stock = stock - :q WHERE id = :id")
-                    ->execute([':q' => $cantidad, ':id' => $productoId]);
+                    ->execute([':q' => $stockDescuento, ':id' => $productoId]);
             }
 
             // Recalcular total con un solo UPDATE (no hace falta sumar en PHP)
@@ -791,7 +814,9 @@ switch ($action) {
             $db->beginTransaction();
 
             $itSt = $db->prepare("
-                SELECT ci.id, ci.comanda_id, ci.producto_id, ci.cantidad, p.product_type
+                SELECT ci.id, ci.comanda_id, ci.producto_id, ci.cantidad,
+                       COALESCE(ci.factor_unidad, 1) AS factor_unidad,
+                       p.product_type
                 FROM comanda_items ci
                 JOIN productos p ON p.id = ci.producto_id
                 WHERE ci.id = :id FOR UPDATE
@@ -812,10 +837,11 @@ switch ($action) {
 
             $db->prepare("DELETE FROM comanda_items WHERE id = :id")->execute([':id' => $itemId]);
 
-            // Reponer stock si no era servicio
+            // Reponer stock si no era servicio: cantidad * factor (ej. 1 CAJA => +12 unidades)
             if (($item['product_type'] ?? 'product') !== 'service') {
+                $stockRepone = (float)$item['cantidad'] * (float)$item['factor_unidad'];
                 $db->prepare("UPDATE productos SET stock = stock + :q WHERE id = :id")
-                    ->execute([':q' => $item['cantidad'], ':id' => $item['producto_id']]);
+                    ->execute([':q' => $stockRepone, ':id' => $item['producto_id']]);
             }
 
             $db->prepare("UPDATE comandas SET total = COALESCE((SELECT SUM(subtotal) FROM comanda_items WHERE comanda_id = :c), 0) WHERE id = :c")
@@ -1117,6 +1143,7 @@ switch ($action) {
 
             $itSt = $db->prepare("
                 SELECT ci.id, ci.comanda_id, ci.producto_id, ci.cantidad, ci.precio_unitario,
+                       COALESCE(ci.factor_unidad, 1) AS factor_unidad,
                        p.product_type, p.stock, p.nombre
                 FROM comanda_items ci
                 JOIN productos p ON p.id = ci.producto_id
@@ -1136,17 +1163,19 @@ switch ($action) {
                 jsonResponse(['error' => true, 'message' => 'La comanda ya no esta abierta'], 400);
             }
 
-            $delta     = $nuevaCant - (float)$item['cantidad'];
-            $esService = (($item['product_type'] ?? 'product') === 'service');
+            $factor      = (float)$item['factor_unidad'];
+            $delta       = $nuevaCant - (float)$item['cantidad'];
+            $deltaStock  = $delta * $factor;  // delta en unidades base
+            $esService   = (($item['product_type'] ?? 'product') === 'service');
 
-            if (!$esService && $delta > 0 && (float)$item['stock'] < $delta) {
+            if (!$esService && $deltaStock > 0 && (float)$item['stock'] < $deltaStock) {
                 $db->rollBack();
                 jsonResponse(['error' => true, 'message' => "Sin stock de {$item['nombre']} para aumentar"], 400);
             }
 
-            if (!$esService && $delta != 0.0) {
+            if (!$esService && $deltaStock != 0.0) {
                 $db->prepare("UPDATE productos SET stock = stock - :d WHERE id = :id")
-                    ->execute([':d' => $delta, ':id' => $item['producto_id']]);
+                    ->execute([':d' => $deltaStock, ':id' => $item['producto_id']]);
             }
 
             $nuevoSubtotal = (float)$item['precio_unitario'] * $nuevaCant;

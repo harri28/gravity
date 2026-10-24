@@ -272,7 +272,9 @@ CREATE TABLE IF NOT EXISTS comanda_items (
     subtotal        DECIMAL(10,2) NOT NULL,
     hora_pedido     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     usuario_id      INTEGER       NOT NULL,   -- quien agrego el item (ref public.usuarios)
-    notas           TEXT
+    notas           TEXT,
+    unidad_medida   VARCHAR(50),               -- presentacion elegida (ej. "CAJA"), NULL = unidad base
+    factor_unidad   DECIMAL(10,2) NOT NULL DEFAULT 1  -- cuantas unidades base equivale (12 para CAJA de 12)
 );
 CREATE INDEX IF NOT EXISTS idx_comanda_items_comanda ON comanda_items (comanda_id);
 
