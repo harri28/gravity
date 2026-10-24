@@ -1308,7 +1308,7 @@ function renderPage(page) {
         return `<tr style="font-size:14px">
             <td style="font-family:monospace;color:var(--text-muted)">${p.codigo_interno || '<span style="color:var(--text-light)">—</span>'}</td>
             <td style="font-weight:500">
-                <span onclick='verProducto(${JSON.stringify(p)})'
+                <span onclick='verProducto(${JSON.stringify(p).replace(/'/g, "&#39;")})'
                       style="color:var(--primary);cursor:pointer">${p.nombre}</span>${favIcon}${recetaIcon}
             </td>
             <td>${p.categoria || '<span style="color:var(--text-light)">—</span>'}</td>
@@ -1316,7 +1316,7 @@ function renderPage(page) {
             <td style="text-align:center;padding-left:32px;min-width:110px;white-space:nowrap">
                 <span style="${stockCls}">${p.stock}</span>
                 ${stockBadge}
-                ${esAdmin ? `<button type="button" onclick='openAjusteModal(${JSON.stringify(p)})' title="Ajustar stock"
+                ${esAdmin ? `<button type="button" onclick='openAjusteModal(${JSON.stringify(p).replace(/'/g, "&#39;")})' title="Ajustar stock"
                     style="background:none;border:none;color:var(--primary);cursor:pointer;padding:2px 4px;margin-left:4px">
                     <i class="fas fa-sliders"></i>
                 </button>` : ''}

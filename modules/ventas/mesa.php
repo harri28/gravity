@@ -551,10 +551,13 @@ function renderItem(it) {
     const horaTxt = hora ? hora.toLocaleTimeString('es-PE', {hour:'2-digit', minute:'2-digit'}) : '';
     const cant = parseFloat(it.cantidad);
     const cantTxt = Number.isInteger(cant) ? String(cant) : cant.toFixed(2);
+    const nombreTxt = it.unidad_medida
+        ? `${escH(it.producto_nombre)} <span style="color:#4f46e5;font-weight:600">(${escH(it.unidad_medida)})</span>`
+        : escH(it.producto_nombre);
     return `
         <div class="item-row">
             <div>
-                <div class="item-nombre">${escH(it.producto_nombre)}</div>
+                <div class="item-nombre">${nombreTxt}</div>
                 <div class="item-meta">${horaTxt} · ${soles(it.precio_unitario)} c/u${it.mozo_nombre ? ' · ' + escH(it.mozo_nombre) : ''}</div>
             </div>
             <div class="item-right">
@@ -631,13 +634,72 @@ function renderProductos() {
 // ---------------------------------------------------------------
 let accionEnCurso = false;
 
+// Cache de presentaciones por producto_id para no repetir fetch si el mozo
+// agrega el mismo producto varias veces en la sesion.
+const _presentacionesCacheMesa = {};
+let _productoParaUnidadMesa = null;
+let _presentacionesActualesMesa = [];
+
 async function agregarProducto(productoId, cantidad = 1) {
+    if (accionEnCurso) return;
+    const producto = PRODUCTOS.find(p => parseInt(p.id) === productoId);
+    if (!producto) return;
+
+    // Si ya tenemos las presentaciones cacheadas, saltar el fetch
+    if (_presentacionesCacheMesa[productoId] !== undefined) {
+        return continuarAgregarAlComanda(producto, _presentacionesCacheMesa[productoId], cantidad);
+    }
+
+    try {
+        const r = await fetch(`${BASE}modules/inventario/api.php?action=precios_unidad_listar&producto_id=${productoId}`);
+        const data = await r.json();
+        _presentacionesCacheMesa[productoId] = Array.isArray(data) ? data : [];
+        return continuarAgregarAlComanda(producto, _presentacionesCacheMesa[productoId], cantidad);
+    } catch (e) {
+        _presentacionesCacheMesa[productoId] = [];
+        return continuarAgregarAlComanda(producto, [], cantidad);
+    }
+}
+
+// Si no hay presentaciones alternativas, agregar directo. Si hay, abrir modal.
+function continuarAgregarAlComanda(producto, presentaciones, cantidad) {
+    if (!presentaciones || !presentaciones.length) {
+        return agregarAlComandaConUnidad(producto, null, cantidad);
+    }
+    _productoParaUnidadMesa     = producto;
+    _presentacionesActualesMesa = presentaciones;
+
+    document.getElementById('unidad-mesa-producto-nombre').textContent = producto.nombre;
+    const base = { unidad_medida: null, precio_venta: producto.precio_venta };
+    const opciones = [base, ...presentaciones];
+    document.getElementById('unidad-mesa-opciones').innerHTML = opciones.map(op => {
+        const label  = op.unidad_medida || 'Unidad';
+        const precio = parseFloat(op.precio_venta || 0).toFixed(2);
+        const attr   = op.unidad_medida ? `'${op.unidad_medida.replace(/'/g, "\\'")}'` : 'null';
+        return `<button type="button" class="btn btn-outline" style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;width:100%;margin-bottom:8px"
+            onclick="seleccionarUnidadMesa(${attr})">
+            <span style="font-weight:600">${label}</span>
+            <span style="color:var(--primary);font-weight:700">S/ ${precio}</span>
+        </button>`;
+    }).join('');
+    openModal('modal-unidad-mesa');
+}
+
+function seleccionarUnidadMesa(unidadMedida) {
+    const producto = _productoParaUnidadMesa;
+    closeModal('modal-unidad-mesa');
+    if (!producto) return;
+    agregarAlComandaConUnidad(producto, unidadMedida, 1);
+}
+
+async function agregarAlComandaConUnidad(producto, unidadMedida, cantidad) {
     if (accionEnCurso) return;
     accionEnCurso = true;
     const d = await postJson(`${API}?action=comanda_agregar_item`, {
         comanda_id: COMANDA_ID,
-        producto_id: productoId,
+        producto_id: parseInt(producto.id),
         cantidad: cantidad,
+        unidad_medida: unidadMedida,
     });
     accionEnCurso = false;
     if (d.error) { showToast(d.message, 'error'); return; }
@@ -745,7 +807,7 @@ async function buscarCliente(q) {
         }
         const nombre = row.razon_social || row.nombre_completo || `${row.nombres || ''} ${row.apellidos || ''}`.trim();
         const doc    = row.numero_documento || row.ruc || row.dni || '';
-        box.innerHTML = `<div class="sugerencia" onclick='seleccionarCliente(${JSON.stringify({id: row.id, nombre, doc, ruc: row.ruc})})'>
+        box.innerHTML = `<div class="sugerencia" onclick='seleccionarCliente(${JSON.stringify({id: row.id, nombre, doc, ruc: row.ruc}).replace(/'/g, "&#39;")})'>
             <strong>${escH(nombre)}</strong><br>
             <span class="sug-doc">${escH(doc)}</span>
         </div>`;

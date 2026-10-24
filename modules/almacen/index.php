@@ -960,7 +960,7 @@ function buscarProductoSalida(q) {
                 return;
             }
             dropdown.innerHTML = data.map(p => `
-                <div onclick='seleccionarProductoSalida(${JSON.stringify(p)})'
+                <div onclick='seleccionarProductoSalida(${JSON.stringify(p).replace(/'/g, "&#39;")})'
                     style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);
                            display:flex;justify-content:space-between;align-items:center;font-size:.85rem"
                     onmouseover="this.style.background='var(--primary-light)'"
@@ -1322,7 +1322,7 @@ function buscarProducto(q) {
                 return;
             }
             dropdown.innerHTML = data.map(p => `
-                <div onclick='seleccionarProducto(${JSON.stringify(p)})'
+                <div onclick='seleccionarProducto(${JSON.stringify(p).replace(/'/g, "&#39;")})'
                     style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);
                            display:flex;justify-content:space-between;align-items:center;font-size:.85rem"
                     onmouseover="this.style.background='var(--primary-light)'"

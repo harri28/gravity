@@ -438,7 +438,7 @@ function loadProveedores() {
                     <td>${activo ? '<span class="badge b-activo">Activo</span>' : '<span class="badge b-inactivo">Inactivo</span>'}</td>
                     <td>
                         <div style="display:flex;gap:5px;justify-content:flex-end">
-                            <button class="btn btn-secondary btn-sm btn-icon" title="Editar" onclick='openProveedorModal(${JSON.stringify(p)})'>
+                            <button class="btn btn-secondary btn-sm btn-icon" title="Editar" onclick='openProveedorModal(${JSON.stringify(p).replace(/'/g, "&#39;")})'>
                                 <i class="fas fa-edit"></i>
                             </button>
                             <button class="btn btn-secondary btn-sm btn-icon"
