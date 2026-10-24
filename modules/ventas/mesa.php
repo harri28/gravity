@@ -198,88 +198,173 @@ include '../../includes/header.php';
 </div>
 
 <!-- ======================================================
-     MODAL: Cobrar
+     MODAL: Informacion de la venta (replica del modal del POS directo)
+     Diseno identico al #modal-cobro de pos.php para que el flujo visual
+     sea el mismo en POS y en Mesas. Dividir cuenta y Credito desde mesa
+     quedan ocultos por ahora (ver docs/implementaciones_futuras.md).
      ====================================================== -->
 <div class="modal-overlay" id="modal-cobrar">
-    <div class="modal" style="max-width:460px">
-        <div class="modal-header">
-            <h3 class="modal-title">Cobrar mesa <span id="cobro-mesa-num" style="color:var(--primary)"></span></h3>
-            <button class="modal-close" onclick="closeModal('modal-cobrar')"><i class="fas fa-times"></i></button>
+    <div class="modal" style="max-width:500px">
+        <div class="modal-header" style="padding:14px 18px">
+            <h3 class="modal-title" style="font-size:.88rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase">
+                Información de la Venta
+                <span id="cobro-mesa-num" style="color:var(--primary);font-weight:600;margin-left:6px"></span>
+            </h3>
+            <button class="modal-close" onclick="closeModal('modal-cobrar')" style="display:flex;align-items:center;gap:5px;font-size:.8rem;background:none;border:none;color:var(--text-muted);cursor:pointer">
+                Cerrar <i class="fas fa-times"></i>
+            </button>
         </div>
-        <div class="modal-body">
+        <div class="modal-body" style="padding:16px 18px">
 
-            <div class="cobro-total-box">
-                <div>Total a cobrar</div>
-                <div class="cobro-total-num" id="cobro-total-num">S/ 0.00</div>
-                <div class="cobro-total-sub"><span id="cobro-items-count">0</span> items</div>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Tipo de comprobante</label>
-                <div class="tipo-pills">
-                    <button type="button" class="tipo-pill active" data-tipo="ticket" onclick="setTipoComp('ticket', this)">
-                        <i class="fas fa-receipt"></i> Ticket
-                    </button>
-                    <button type="button" class="tipo-pill" data-tipo="boleta" onclick="setTipoComp('boleta', this)">
-                        <i class="fas fa-file-invoice"></i> Boleta
-                    </button>
-                    <button type="button" class="tipo-pill" data-tipo="factura" onclick="setTipoComp('factura', this)">
-                        <i class="fas fa-file-invoice-dollar"></i> Factura
-                    </button>
+            <!-- Fila 1: Tipo documento | Tipo impresion | Serie -->
+            <div style="display:grid;grid-template-columns:2fr 1.2fr 1fr;gap:10px;margin-bottom:12px">
+                <div>
+                    <label class="form-label" style="font-size:.71rem">Tipo de documento</label>
+                    <select class="form-control" id="cm-tipo-comp" style="font-size:.82rem" onchange="cmOnComprobanteChange()">
+                        <option value="ticket">Ticket</option>
+                        <option value="boleta">Boleta Electrónica</option>
+                        <option value="factura">Factura Electrónica</option>
+                    </select>
                 </div>
-                <small style="color:var(--text-muted);font-size:.72rem">
-                    Boleta/Factura se envian a SUNAT al confirmar.
-                </small>
+                <div>
+                    <label class="form-label" style="font-size:.71rem">Tipo impresión</label>
+                    <select class="form-control" id="cm-tipo-impresion" style="font-size:.82rem">
+                        <option value="ticket">Ticket</option>
+                        <option value="a4">A4</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" style="font-size:.71rem">Serie</label>
+                    <select class="form-control" id="cm-serie" style="font-size:.82rem">
+                        <option value="">—</option>
+                    </select>
+                </div>
             </div>
 
-            <div class="form-group" id="row-cliente" style="display:none">
-                <label class="form-label">Cliente
-                    <small id="cliente-req-hint" style="color:var(--text-muted);font-weight:400"></small>
-                </label>
-                <div class="cliente-search-wrap">
-                    <input type="text" id="cliente-input" class="form-control" placeholder="Buscar por DNI, RUC o nombre..." autocomplete="off" oninput="buscarClienteDebounced()">
-                    <button type="button" class="btn btn-outline btn-sm" style="white-space:nowrap" onclick="usarClientesVarios()" title="Para boleta rapida sin DNI">
+            <!-- Cliente -->
+            <div style="margin-bottom:14px" id="cm-row-cliente">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                    <label class="form-label" style="font-size:.71rem;margin:0">
+                        Cliente <small id="cm-cliente-req-hint" style="color:var(--text-muted);font-weight:400"></small>
+                    </label>
+                    <button type="button" class="btn btn-outline btn-sm" style="white-space:nowrap;font-size:.72rem" onclick="cmUsarClientesVarios()" title="Para boleta rápida sin DNI">
                         <i class="fas fa-user"></i> Varios
                     </button>
                 </div>
-                <div id="cliente-sugerencias" class="cliente-sugerencias"></div>
-                <div id="cliente-seleccionado" class="cliente-pill" style="display:none">
-                    <span id="cliente-sel-nombre"></span>
-                    <button type="button" onclick="limpiarCliente()" aria-label="Quitar"><i class="fas fa-times"></i></button>
+                <div class="cliente-search-wrap">
+                    <input type="text" id="cm-cliente-input" class="form-control" placeholder="Buscar por DNI, RUC o nombre..." autocomplete="off" oninput="cmBuscarClienteDebounced()" style="font-size:.82rem">
+                </div>
+                <div id="cm-cliente-sugerencias" class="cliente-sugerencias"></div>
+                <div id="cm-cliente-seleccionado" class="cliente-pill" style="display:none;margin-top:6px">
+                    <span id="cm-cliente-sel-nombre"></span>
+                    <button type="button" onclick="cmLimpiarCliente()" aria-label="Quitar"><i class="fas fa-times"></i></button>
+                </div>
+                <small style="color:var(--text-muted);font-size:.68rem">Busca por nombre, DNI o RUC.</small>
+            </div>
+
+            <!-- Dividir cuenta (OCULTO en mesa por ahora: ver docs/implementaciones_futuras.md) -->
+            <!-- Se habilitara cuando se implemente cobrar_comanda_split (N comprobantes).
+            <div style="text-align:right;margin-bottom:14px">
+                <button class="btn btn-primary btn-sm" style="font-size:.77rem">
+                    <i class="fas fa-plus"></i> Dividir cuenta
+                </button>
+            </div>
+            -->
+
+            <div style="border-top:1px solid var(--border);margin-bottom:14px"></div>
+
+            <!-- Pago simple: forma + referencia + monto cobrado -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+                <div>
+                    <label class="form-label" style="font-size:.71rem">Forma de pago</label>
+                    <select class="form-control" id="cm-tipo-pago" style="font-size:.82rem" onchange="cmOnTipoPagoChange()">
+                        <option value="efectivo">Efectivo</option>
+                        <option value="yape">Yape</option>
+                        <option value="plin">Plin</option>
+                        <option value="tarjeta">Visa/Mastercard</option>
+                        <option value="transferencia">Transferencia</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" style="font-size:.71rem">Referencia</label>
+                    <select class="form-control" id="cm-cuenta-banco" style="font-size:.82rem">
+                        <option value="caja_chica">CAJA CHICA</option>
+                        <option value="banco">BANCO</option>
+                        <option value="yape_cuenta">YAPE</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" style="font-size:.71rem">Monto cobrado</label>
+                    <div class="input-group">
+                        <span class="input-group-icon" style="font-size:.78rem;font-weight:700;color:var(--text-muted)">S/</span>
+                        <input type="text" id="cm-monto-cobrado" class="form-control" readonly
+                            style="font-size:.82rem;padding-left:28px;background:var(--surface-2);color:var(--text-muted);cursor:default">
+                    </div>
                 </div>
             </div>
 
-            <div class="form-group">
-                <label class="form-label">Metodo de pago</label>
-                <select id="cobro-metodo" class="form-control" onchange="onMetodoChange()">
-                    <option value="efectivo">Efectivo</option>
-                    <option value="tarjeta">Tarjeta</option>
-                    <option value="transferencia">Transferencia</option>
-                    <option value="yape">Yape</option>
-                    <option value="plin">Plin</option>
-                </select>
-            </div>
-
-            <div class="form-group" id="row-monto-recibido">
-                <label class="form-label">Monto recibido</label>
-                <input type="number" id="cobro-monto" class="form-control" step="0.01" min="0" placeholder="0.00" oninput="calcVuelto()">
-                <div class="cobro-vuelto-row">
-                    <span>Vuelto</span>
-                    <strong id="cobro-vuelto">S/ 0.00</strong>
+            <!-- Efectivo recibido (solo si pago en efectivo) -->
+            <div id="cm-row-efectivo" style="margin-bottom:12px">
+                <label class="form-label" style="font-size:.71rem">Efectivo recibido</label>
+                <div class="input-group">
+                    <span class="input-group-icon" style="font-size:.85rem;font-weight:700;color:var(--primary)">S/</span>
+                    <input type="number" id="cm-monto-recibido" class="form-control" placeholder="0.00"
+                        step="0.10" min="0" oninput="cmCalcVuelto()"
+                        style="font-size:1rem;padding-left:30px;font-weight:600;border-color:var(--primary)"
+                        autocomplete="off">
                 </div>
             </div>
 
-            <div class="form-group">
-                <label class="form-label">Observaciones <small style="color:var(--text-muted)">(opcional)</small></label>
-                <textarea id="cobro-obs" class="form-control" rows="2" placeholder="Ej: cliente pidio factura por correo..."></textarea>
+            <!-- Observacion -->
+            <div style="margin-bottom:14px">
+                <label class="form-label" style="font-size:.71rem">Observación</label>
+                <input type="text" id="cm-observacion" class="form-control" placeholder="glosa" style="font-size:.82rem">
             </div>
 
+            <!-- Toggle imprimir obs -->
+            <div style="margin-bottom:10px">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.81rem;color:var(--text)">
+                    <span id="cm-track-obs" onclick="cmToggleSwitch('cm-check-obs','cm-track-obs', event)"
+                        style="width:38px;height:21px;background:var(--primary);border-radius:11px;position:relative;flex-shrink:0;cursor:pointer;transition:background .2s">
+                        <span style="position:absolute;top:3px;left:3px;width:15px;height:15px;background:#fff;border-radius:50%;transition:transform .2s;transform:translateX(17px)"></span>
+                    </span>
+                    <input type="checkbox" id="cm-check-obs" checked style="display:none">
+                    Imprimir la observación en el comprobante
+                </label>
+            </div>
+
+            <!-- Toggle credito (OCULTO en mesa por ahora: ver docs/implementaciones_futuras.md) -->
+            <!--
+            <div style="margin-bottom:16px">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.81rem;color:var(--text)">
+                    <span style="width:38px;height:21px;background:#d1d5db;border-radius:11px"></span>
+                    ¿La venta es a crédito?
+                </label>
+            </div>
+            -->
+
+            <!-- Totales: Total venta | Total pagar | Vuelto -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-top:2px solid var(--border);padding-top:14px;text-align:center">
+                <div>
+                    <div style="font-size:.71rem;color:var(--text-muted);margin-bottom:4px">Total de venta</div>
+                    <div style="font-size:1.15rem;font-weight:700;color:var(--primary)" id="cm-total-venta">S/ 0.00</div>
+                </div>
+                <div style="border-left:1px solid var(--border);border-right:1px solid var(--border)">
+                    <div style="font-size:.71rem;color:var(--text-muted);margin-bottom:4px">Total a pagar</div>
+                    <div style="font-size:1.15rem;font-weight:700;color:var(--primary)" id="cm-total-pagar">S/ 0.00</div>
+                </div>
+                <div>
+                    <div style="font-size:.71rem;color:var(--text-muted);margin-bottom:4px">Vuelto</div>
+                    <div style="font-size:1.15rem;font-weight:700;color:var(--success)" id="cm-vuelto">S/ 0.00</div>
+                </div>
+            </div>
         </div>
-        <div class="modal-footer">
-            <button class="btn btn-outline" onclick="closeModal('modal-cobrar')">Cancelar</button>
-            <button class="btn btn-primary" id="btn-confirmar-cobro" onclick="confirmarCobro()">
-                <i class="fas fa-check"></i> Confirmar cobro
+
+        <div class="modal-footer" style="justify-content:flex-end;padding:12px 18px;gap:8px">
+            <button class="btn btn-primary" id="btn-confirmar-cobro" onclick="confirmarCobro()" style="font-size:.85rem">
+                <i class="fas fa-check"></i> Pagar y emitir comprobante
             </button>
+            <button class="btn btn-outline" onclick="closeModal('modal-cobrar')" style="font-size:.85rem">Cancelar</button>
         </div>
     </div>
 </div>
@@ -827,78 +912,136 @@ let TIPO_COMP_SELECT = 'ticket';
 let CLIENTE_SELECT = null;      // {id, nombre, documento, tipo_doc}
 let _clienteBuscarTimer = null;
 
+// ================================================================
+// Cobro de mesa — modal "Informacion de la Venta" (replica del POS).
+// Toda la logica usa prefijo "cm" (cobro-mesa) para no colisionar con
+// nada global. El endpoint sigue siendo cobrar_comanda, extendido para
+// aceptar los campos nuevos (serie, cuenta_banco, imprimir_obs) de forma
+// opcional (compatibilidad hacia atras).
+// ================================================================
+
+let _cmSeriesCache = null; // {boleta: ['B001'], factura: ['F001'], ticket: ['TK01']}
+
 function cobrar() {
     if (!ITEMS.length) {
         showToast('No hay items para cobrar', 'error');
         return;
     }
     const total = ITEMS.reduce((s, it) => s + parseFloat(it.subtotal || 0), 0);
+
     document.getElementById('cobro-mesa-num').textContent = '#' + (COMANDA?.mesa_numero || '');
-    document.getElementById('cobro-total-num').textContent = soles(total);
-    document.getElementById('cobro-items-count').textContent = ITEMS.length;
-    document.getElementById('cobro-metodo').value = 'efectivo';
-    document.getElementById('cobro-monto').value = '';
-    document.getElementById('cobro-obs').value = '';
-    document.getElementById('btn-confirmar-cobro').disabled = false;
-    document.getElementById('btn-confirmar-cobro').innerHTML = '<i class="fas fa-check"></i> Confirmar cobro';
+    document.getElementById('cm-tipo-comp').value       = 'ticket';
+    document.getElementById('cm-tipo-impresion').value  = 'ticket';
+    document.getElementById('cm-tipo-pago').value       = 'efectivo';
+    document.getElementById('cm-cuenta-banco').value    = 'caja_chica';
+    document.getElementById('cm-monto-cobrado').value   = total.toFixed(2);
+    document.getElementById('cm-monto-recibido').value  = '';
+    document.getElementById('cm-observacion').value     = '';
+    document.getElementById('cm-total-venta').textContent = soles(total);
+    document.getElementById('cm-total-pagar').textContent = soles(total);
+    document.getElementById('cm-vuelto').textContent      = soles(0);
+
     TIPO_COMP_SELECT = 'ticket';
-    CLIENTE_SELECT = null;
-    document.querySelectorAll('.tipo-pill').forEach(b => b.classList.toggle('active', b.dataset.tipo === 'ticket'));
-    limpiarCliente();
-    document.getElementById('cliente-input').value = '';
-    onTipoChange();
-    onMetodoChange();
-    calcVuelto();
+    CLIENTE_SELECT   = null;
+    cmLimpiarCliente();
+    cmOnComprobanteChange();
+    cmOnTipoPagoChange();
+    cmCargarSeries();
+
+    const btn = document.getElementById('btn-confirmar-cobro');
+    btn.disabled  = false;
+    btn.innerHTML = '<i class="fas fa-check"></i> Pagar y emitir comprobante';
+
     openModal('modal-cobrar');
-    setTimeout(() => document.getElementById('cobro-monto').focus(), 80);
+    setTimeout(() => document.getElementById('cm-monto-recibido').focus(), 80);
 }
 
-function setTipoComp(tipo, btnEl) {
-    TIPO_COMP_SELECT = tipo;
-    document.querySelectorAll('.tipo-pill').forEach(b => b.classList.toggle('active', b === btnEl));
-    onTipoChange();
+// ---------------- Series disponibles por tipo ----------------
+async function cmCargarSeries() {
+    if (_cmSeriesCache) { cmPintarSerie(); return; }
+    try {
+        const r = await fetch(`${API}?action=series_disponibles`);
+        const d = await r.json();
+        _cmSeriesCache = (d && !d.error) ? d : {};
+    } catch (e) { _cmSeriesCache = {}; }
+    cmPintarSerie();
 }
 
-function onTipoChange() {
-    const rowCliente = document.getElementById('row-cliente');
-    const hint       = document.getElementById('cliente-req-hint');
+function cmPintarSerie() {
+    const tipo = document.getElementById('cm-tipo-comp').value;
+    const sel  = document.getElementById('cm-serie');
+    const list = (_cmSeriesCache && _cmSeriesCache[tipo]) || [];
+    sel.innerHTML = list.length
+        ? list.map(s => `<option value="${s}">${s}</option>`).join('')
+        : '<option value="">—</option>';
+}
+
+function cmOnComprobanteChange() {
+    TIPO_COMP_SELECT = document.getElementById('cm-tipo-comp').value;
+    cmPintarSerie();
+
+    // Mostrar / ocultar fila de cliente segun el tipo.
+    const row  = document.getElementById('cm-row-cliente');
+    const hint = document.getElementById('cm-cliente-req-hint');
     if (TIPO_COMP_SELECT === 'ticket') {
-        rowCliente.style.display = 'none';
+        row.style.display = 'none';
     } else {
-        rowCliente.style.display = '';
+        row.style.display = '';
         hint.textContent = TIPO_COMP_SELECT === 'factura'
             ? '— requerido (debe tener RUC)'
             : '— opcional (si no eliges, va a Clientes Varios)';
     }
 }
 
-// ---------------- Cliente search ----------------
-function buscarClienteDebounced() {
-    clearTimeout(_clienteBuscarTimer);
-    const q = document.getElementById('cliente-input').value.trim();
-    const box = document.getElementById('cliente-sugerencias');
-    if (q.length < 2) { box.innerHTML = ''; return; }
-    _clienteBuscarTimer = setTimeout(() => buscarCliente(q), 250);
+function cmOnTipoPagoChange() {
+    const metodo = document.getElementById('cm-tipo-pago').value;
+    document.getElementById('cm-row-efectivo').style.display = metodo === 'efectivo' ? '' : 'none';
+    cmCalcVuelto();
 }
 
-async function buscarCliente(q) {
+function cmCalcVuelto() {
+    const total  = ITEMS.reduce((s, it) => s + parseFloat(it.subtotal || 0), 0);
+    const metodo = document.getElementById('cm-tipo-pago').value;
+    const recibido = parseFloat(document.getElementById('cm-monto-recibido').value || 0);
+    const vueltoEl = document.getElementById('cm-vuelto');
+    if (metodo !== 'efectivo') { vueltoEl.textContent = soles(0); return; }
+    const vuelto = recibido - total;
+    vueltoEl.textContent = soles(Math.max(0, vuelto));
+    vueltoEl.style.color = vuelto < 0 ? 'var(--danger)' : 'var(--success)';
+}
+
+function cmToggleSwitch(checkboxId, trackId, ev) {
+    if (ev) ev.preventDefault();
+    const chk   = document.getElementById(checkboxId);
+    const track = document.getElementById(trackId);
+    chk.checked = !chk.checked;
+    track.style.background = chk.checked ? 'var(--primary)' : '#d1d5db';
+    track.firstElementChild.style.transform = chk.checked ? 'translateX(17px)' : 'translateX(0)';
+}
+
+// ---------------- Cliente search ----------------
+function cmBuscarClienteDebounced() {
+    clearTimeout(_clienteBuscarTimer);
+    const q = document.getElementById('cm-cliente-input').value.trim();
+    const box = document.getElementById('cm-cliente-sugerencias');
+    if (q.length < 2) { box.innerHTML = ''; return; }
+    _clienteBuscarTimer = setTimeout(() => cmBuscarCliente(q), 250);
+}
+
+async function cmBuscarCliente(q) {
     try {
         const r = await fetch(`${API}?action=buscar_cliente&q=${encodeURIComponent(q)}`);
         const d = await r.json();
-        const box = document.getElementById('cliente-sugerencias');
+        const box = document.getElementById('cm-cliente-sugerencias');
         if (!d || d.error) { box.innerHTML = ''; return; }
-        // El endpoint devuelve un solo cliente (match exacto o similar).
-        // Lo mostramos como una sola sugerencia.
         const row = Array.isArray(d) ? d[0] : d;
         if (!row) {
-            box.innerHTML = `<div class="sugerencia" style="color:var(--text-muted);cursor:default">
-                Sin resultados para "${escH(q)}"
-            </div>`;
+            box.innerHTML = `<div class="sugerencia" style="color:var(--text-muted);cursor:default">Sin resultados para "${escH(q)}"</div>`;
             return;
         }
         const nombre = row.razon_social || row.nombre_completo || `${row.nombres || ''} ${row.apellidos || ''}`.trim();
         const doc    = row.numero_documento || row.ruc || row.dni || '';
-        box.innerHTML = `<div class="sugerencia" onclick='seleccionarCliente(${JSON.stringify({id: row.id, nombre, doc, ruc: row.ruc}).replace(/'/g, "&#39;")})'>
+        box.innerHTML = `<div class="sugerencia" onclick='cmSeleccionarCliente(${JSON.stringify({id: row.id, nombre, doc, ruc: row.ruc}).replace(/'/g, "&#39;")})'>
             <strong>${escH(nombre)}</strong><br>
             <span class="sug-doc">${escH(doc)}</span>
         </div>`;
@@ -907,54 +1050,43 @@ async function buscarCliente(q) {
     }
 }
 
-function seleccionarCliente(c) {
+function cmSeleccionarCliente(c) {
     CLIENTE_SELECT = c;
-    document.getElementById('cliente-sel-nombre').textContent = `${c.nombre} · ${c.doc}`;
-    document.getElementById('cliente-seleccionado').style.display = '';
-    document.getElementById('cliente-input').value = '';
-    document.getElementById('cliente-sugerencias').innerHTML = '';
+    document.getElementById('cm-cliente-sel-nombre').textContent = `${c.nombre} · ${c.doc}`;
+    document.getElementById('cm-cliente-seleccionado').style.display = '';
+    document.getElementById('cm-cliente-input').value = '';
+    document.getElementById('cm-cliente-sugerencias').innerHTML = '';
 }
 
-function limpiarCliente() {
+function cmLimpiarCliente() {
     CLIENTE_SELECT = null;
-    document.getElementById('cliente-seleccionado').style.display = 'none';
-    document.getElementById('cliente-sel-nombre').textContent = '';
-    document.getElementById('cliente-sugerencias').innerHTML = '';
+    const sel = document.getElementById('cm-cliente-seleccionado');
+    const nom = document.getElementById('cm-cliente-sel-nombre');
+    const sug = document.getElementById('cm-cliente-sugerencias');
+    const inp = document.getElementById('cm-cliente-input');
+    if (sel) sel.style.display = 'none';
+    if (nom) nom.textContent = '';
+    if (sug) sug.innerHTML = '';
+    if (inp) inp.value = '';
 }
 
-function usarClientesVarios() {
-    // El backend buscara automaticamente el cliente "Clientes Varios"
-    // (numero_documento '00000000'). Para el UI mostramos un placeholder.
-    seleccionarCliente({ id: null, nombre: 'Clientes Varios', doc: '00000000' });
-}
-
-function onMetodoChange() {
-    const metodo = document.getElementById('cobro-metodo').value;
-    // Vuelto solo tiene sentido para efectivo. Para los otros, el monto recibido
-    // es siempre = total (no hay vuelto), asi que lo escondemos para no confundir.
-    document.getElementById('row-monto-recibido').style.display = metodo === 'efectivo' ? '' : 'none';
-    calcVuelto();
-}
-
-function calcVuelto() {
-    const total  = ITEMS.reduce((s, it) => s + parseFloat(it.subtotal || 0), 0);
-    const metodo = document.getElementById('cobro-metodo').value;
-    const monto  = parseFloat(document.getElementById('cobro-monto').value || 0);
-    const row    = document.querySelector('.cobro-vuelto-row');
-    if (metodo !== 'efectivo') { if (row) row.classList.remove('negativo'); return; }
-    const vuelto = monto - total;
-    document.getElementById('cobro-vuelto').textContent = soles(Math.max(0, vuelto));
-    if (row) row.classList.toggle('negativo', vuelto < 0);
+function cmUsarClientesVarios() {
+    cmSeleccionarCliente({ id: null, nombre: 'Clientes Varios', doc: '00000000' });
 }
 
 async function confirmarCobro() {
-    const metodo = document.getElementById('cobro-metodo').value;
-    const monto  = parseFloat(document.getElementById('cobro-monto').value || 0);
-    const obs    = document.getElementById('cobro-obs').value.trim();
-    const total  = ITEMS.reduce((s, it) => s + parseFloat(it.subtotal || 0), 0);
+    const tipoComp   = document.getElementById('cm-tipo-comp').value;
+    const tipoImpr   = document.getElementById('cm-tipo-impresion').value;
+    const serie      = document.getElementById('cm-serie').value;
+    const metodo     = document.getElementById('cm-tipo-pago').value;
+    const cuentaBanco= document.getElementById('cm-cuenta-banco').value;
+    const recibido   = parseFloat(document.getElementById('cm-monto-recibido').value || 0);
+    const obs        = document.getElementById('cm-observacion').value.trim();
+    const imprimirObs= document.getElementById('cm-check-obs').checked;
+    const total      = ITEMS.reduce((s, it) => s + parseFloat(it.subtotal || 0), 0);
 
-    // Validaciones por tipo de comprobante
-    if (TIPO_COMP_SELECT === 'factura') {
+    // Validaciones de cliente por tipo
+    if (tipoComp === 'factura') {
         if (!CLIENTE_SELECT || !CLIENTE_SELECT.id) {
             showToast('Para factura necesitas seleccionar un cliente con RUC', 'error');
             return;
@@ -965,9 +1097,9 @@ async function confirmarCobro() {
         }
     }
 
-    if (metodo === 'efectivo' && monto < total) {
+    if (metodo === 'efectivo' && recibido < total) {
         const ok = await appConfirm(
-            `El monto recibido (${soles(monto)}) es menor al total (${soles(total)}). ¿Confirmar igual?`,
+            `El monto recibido (${soles(recibido)}) es menor al total (${soles(total)}). ¿Confirmar igual?`,
             { titulo: 'Monto insuficiente', textoOk: 'Confirmar', textoNo: 'Cancelar', tipo: 'warning' }
         );
         if (!ok) return;
@@ -981,31 +1113,33 @@ async function confirmarCobro() {
     try {
         d = await postJson(`${API}?action=cobrar_comanda`, {
             comanda_id: COMANDA_ID,
-            tipo_comprobante: TIPO_COMP_SELECT,
+            tipo_comprobante: tipoComp,
+            tipo_impresion: tipoImpr,
+            serie: serie || null,
             tipo_pago: metodo,
-            monto_recibido: metodo === 'efectivo' ? monto : total,
+            cuenta_banco: cuentaBanco,
+            monto_recibido: metodo === 'efectivo' ? recibido : total,
             observaciones: obs,
+            imprimir_observacion: imprimirObs,
             cliente_id: (CLIENTE_SELECT && CLIENTE_SELECT.id) ? CLIENTE_SELECT.id : null,
         });
     } catch (error) {
         showToast(`No se pudo completar el cobro: ${error.message}`, 'error');
         btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-check"></i> Confirmar cobro';
+        btn.innerHTML = '<i class="fas fa-check"></i> Pagar y emitir comprobante';
         return;
     }
 
     if (d.error) {
         showToast(d.message, 'error');
         btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-check"></i> Confirmar cobro';
+        btn.innerHTML = '<i class="fas fa-check"></i> Pagar y emitir comprobante';
         if (d.caja_cerrada) {
             setTimeout(() => { window.location = '../caja/index.php'; }, 2000);
         }
         return;
     }
 
-    // Mensaje de exito: incluye numero completo (B001-00001234) si es SUNAT,
-    // o numero_venta (V20261022-NNNN) si es ticket. Incluye estado SUNAT si aplica.
     const idRef = d.numero_completo || d.numero_venta;
     const sunatSuffix = d.sunat_estado
         ? ` · SUNAT ${d.sunat_ok ? 'Aceptado' : d.sunat_estado}`
