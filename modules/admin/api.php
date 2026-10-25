@@ -338,12 +338,18 @@ switch ($action) {
         // Join con la comanda abierta (si la hay) para que el UI pueda
         // mostrar "ocupada" sin pedir otro endpoint y bloquear la
         // desactivacion de mesas en uso.
+        // Orden natural: numeros puros primero y ordenados como enteros
+        // (asi 2 va antes de 10), luego los alfanumericos (VIP-01, Normal...)
+        // ordenados como texto. Sin esto, '10' iba despues de '1' porque
+        // numero es VARCHAR y se ordenaba lexicograficamente.
         $stmt = $db->query("
             SELECT m.id, m.numero, m.nombre, m.capacidad, m.activa, m.created_at,
                    c.id AS comanda_abierta_id
             FROM mesas m
             LEFT JOIN comandas c ON c.mesa_id = m.id AND c.estado = 'abierta'
-            ORDER BY m.numero ASC
+            ORDER BY (m.numero ~ '^[0-9]+$') DESC,
+                     CASE WHEN m.numero ~ '^[0-9]+$' THEN m.numero::int ELSE NULL END ASC,
+                     m.numero ASC
         ");
         echo json_encode($stmt->fetchAll());
         break;

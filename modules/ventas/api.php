@@ -598,7 +598,9 @@ switch ($action) {
             LEFT JOIN comandas c ON c.mesa_id = m.id AND c.estado = 'abierta'
             LEFT JOIN public.usuarios u ON u.id = c.usuario_apertura_id
             WHERE m.activa = TRUE
-            ORDER BY m.numero ASC
+            ORDER BY (m.numero ~ '^[0-9]+$') DESC,
+                     CASE WHEN m.numero ~ '^[0-9]+$' THEN m.numero::int ELSE NULL END ASC,
+                     m.numero ASC
         ");
         echo json_encode($stmt->fetchAll());
         break;
