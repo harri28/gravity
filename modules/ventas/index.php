@@ -41,22 +41,13 @@ include '../../includes/header.php';
 ?>
 
 <div class="page-header">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;width:100%">
-        <div>
-            <div class="page-title">
-                <i class="fas fa-chair" style="color:var(--primary);margin-right:8px"></i><?= htmlspecialchars($L_mesa_p) ?>
-            </div>
-            <div class="page-subtitle">
-                Grilla de <?= htmlspecialchars(mb_strtolower($L_mesa_p)) ?> libres y ocupadas · <span id="hora-actual"></span>
-            </div>
+    <div>
+        <div class="page-title">
+            <i class="fas fa-chair" style="color:var(--primary);margin-right:8px"></i><?= htmlspecialchars($L_mesa_p) ?>
         </div>
-        <?php if (isAdmin()): ?>
-        <button type="button" class="btn btn-outline btn-sm" onclick="openModalLabels()"
-                title="Configurar nombres de <?= htmlspecialchars($L_mesa_p) ?> y <?= htmlspecialchars($L_comanda_p) ?>"
-                style="flex-shrink:0">
-            <i class="fas fa-cog"></i> Nombres
-        </button>
-        <?php endif; ?>
+        <div class="page-subtitle">
+            Grilla de <?= htmlspecialchars(mb_strtolower($L_mesa_p)) ?> libres y ocupadas · <span id="hora-actual"></span>
+        </div>
     </div>
 </div>
 
@@ -89,53 +80,6 @@ include '../../includes/header.php';
     </div>
 </div>
 
-<?php if (isAdmin()): ?>
-<!-- Modal: configurar labels de mesa/comanda (admin/gerente) -->
-<div class="modal-overlay" id="modal-labels">
-    <div class="modal" style="max-width:520px">
-        <div class="modal-header">
-            <h3 class="modal-title"><i class="fas fa-cog" style="color:var(--primary);margin-right:8px"></i>Configurar nombres</h3>
-            <button class="modal-close" onclick="closeModal('modal-labels')"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="modal-body" style="padding:18px 22px">
-            <div style="font-size:.82rem;color:var(--text-muted);margin-bottom:14px;line-height:1.5">
-                Cambia como se llaman "mesa" y "comanda" en todo el sistema para adaptarlo
-                a tu rubro (restaurante, peluqueria, spa, etc.). Afecta solo UI/UX, no
-                cambia la base de datos. Dejar un campo vacio restaura el default.
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-                <div class="form-group">
-                    <label class="form-label">Unidad (singular)</label>
-                    <input type="text" id="lbl-mesa-s" class="form-control" maxlength="32" placeholder="Mesa">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Unidad (plural)</label>
-                    <input type="text" id="lbl-mesa-p" class="form-control" maxlength="32" placeholder="Mesas">
-                </div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                <div class="form-group">
-                    <label class="form-label">Orden (singular)</label>
-                    <input type="text" id="lbl-comanda-s" class="form-control" maxlength="32" placeholder="Comanda">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Orden (plural)</label>
-                    <input type="text" id="lbl-comanda-p" class="form-control" maxlength="32" placeholder="Comandas">
-                </div>
-            </div>
-            <div style="font-size:.78rem;color:var(--text-muted);margin-top:8px">
-                Ejemplos: Mesa / Comanda · Estacion / Servicio · Cabina / Sesion.
-            </div>
-        </div>
-        <div class="modal-footer">
-            <button class="btn btn-outline" onclick="closeModal('modal-labels')">Cancelar</button>
-            <button class="btn btn-primary" id="btn-guardar-labels" onclick="guardarLabels()">
-                <i class="fas fa-save"></i> Guardar
-            </button>
-        </div>
-    </div>
-</div>
-<?php endif; ?>
 
 <div class="app-toast-container" id="toast-container"></div>
 
@@ -479,58 +423,6 @@ document.addEventListener('visibilitychange', () => {
     else if (!polling) { cargarMesas(); polling = setInterval(cargarMesas, 7000); }
 });
 
-// -----------------------------------------------------------------
-// Modal de configuracion de labels (migration_64). Solo admin/gerente.
-// Al guardar, hace reload de la pagina para que el PHP vuelva a leer
-// tenant_config y renderice las cadenas nuevas en el server-side.
-// -----------------------------------------------------------------
-async function openModalLabels() {
-    try {
-        const r = await fetch('../admin/api.php?action=labels_mesa_get');
-        const d = await r.json();
-        if (d.error) { showToast(d.message || 'No se pudo cargar labels', 'error'); return; }
-        document.getElementById('lbl-mesa-s').value    = d.labels.label_mesa_singular    || '';
-        document.getElementById('lbl-mesa-p').value    = d.labels.label_mesa_plural      || '';
-        document.getElementById('lbl-comanda-s').value = d.labels.label_comanda_singular || '';
-        document.getElementById('lbl-comanda-p').value = d.labels.label_comanda_plural   || '';
-    } catch (e) {
-        // Si falla la lectura, igual mostramos la modal con los valores actuales desde window.LABELS
-        document.getElementById('lbl-mesa-s').value    = (window.LABELS?.mesa?.s)    || '';
-        document.getElementById('lbl-mesa-p').value    = (window.LABELS?.mesa?.p)    || '';
-        document.getElementById('lbl-comanda-s').value = (window.LABELS?.comanda?.s) || '';
-        document.getElementById('lbl-comanda-p').value = (window.LABELS?.comanda?.p) || '';
-    }
-    openModal('modal-labels');
-    setTimeout(() => document.getElementById('lbl-mesa-s').focus(), 100);
-}
-
-async function guardarLabels() {
-    const payload = {
-        label_mesa_singular:    document.getElementById('lbl-mesa-s').value.trim(),
-        label_mesa_plural:      document.getElementById('lbl-mesa-p').value.trim(),
-        label_comanda_singular: document.getElementById('lbl-comanda-s').value.trim(),
-        label_comanda_plural:   document.getElementById('lbl-comanda-p').value.trim(),
-    };
-    const btn = document.getElementById('btn-guardar-labels');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
-    try {
-        const r = await fetch('../admin/api.php?action=labels_mesa_guardar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
-        const d = await r.json();
-        if (d.error) { showToast(d.message, 'error'); return; }
-        showToast('Labels actualizados — recargando...', 'success');
-        setTimeout(() => window.location.reload(), 700);
-    } catch (e) {
-        showToast('Error al guardar labels', 'error');
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-save"></i> Guardar';
-    }
-}
 </script>
 
 <?php include '../../includes/footer.php'; ?>
