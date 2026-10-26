@@ -210,7 +210,8 @@ include '../../includes/header.php';
             <div style="font-size:.82rem;color:var(--text-muted);margin-bottom:14px;line-height:1.5">
                 Cambia como se llaman "mesa" y "comanda" en todo el sistema para adaptarlo
                 a tu rubro (restaurante, peluqueria, spa, etc.). Afecta solo UI/UX, no
-                cambia la base de datos. Dejar un campo vacio restaura el default.
+                cambia la base de datos. <strong>Si dejas el plural vacio</strong>, se autogenera
+                agregando "s" al singular (ej. Servicio &rarr; Servicios).
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
                 <div class="form-group">
@@ -1295,8 +1296,27 @@ async function openModalLabels() {
         document.getElementById('lbl-comanda-s').value = (window.LABELS?.comanda?.s) || '';
         document.getElementById('lbl-comanda-p').value = (window.LABELS?.comanda?.p) || '';
     }
+    bindLabelAutoPlural();
     openModal('modal-labels');
     setTimeout(() => document.getElementById('lbl-mesa-s').focus(), 100);
+}
+
+// Al tipear en el singular, autocompleta el plural con singular+'s' si el
+// usuario todavia no toco manualmente el campo plural. Si lo toco, lo deja
+// intacto. Reset del flag en cada apertura de la modal.
+function bindLabelAutoPlural() {
+    const pairs = [['lbl-mesa-s', 'lbl-mesa-p'], ['lbl-comanda-s', 'lbl-comanda-p']];
+    pairs.forEach(([sId, pId]) => {
+        const s = document.getElementById(sId);
+        const p = document.getElementById(pId);
+        delete p.dataset.touched;
+        if (s.dataset.boundAutoplural) return;
+        s.dataset.boundAutoplural = '1';
+        s.addEventListener('input', () => {
+            if (!p.dataset.touched) p.value = s.value.trim() ? s.value.trim() + 's' : '';
+        });
+        p.addEventListener('input', () => { p.dataset.touched = '1'; });
+    });
 }
 
 async function guardarLabels() {

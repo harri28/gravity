@@ -459,19 +459,34 @@ switch ($action) {
         // "Mesa"/"Comanda"; una peluqueria lo cambia a "Estacion"/"Servicio";
         // un spa a "Cabina"/"Sesion". Afecta solo UI/UX, nada de la DB.
         $d = json_decode(file_get_contents('php://input'), true);
-        $defaults = ['Mesa', 'Mesas', 'Comanda', 'Comandas'];
         $vals = [
             'label_mesa_singular'    => trim((string)($d['label_mesa_singular']    ?? '')),
             'label_mesa_plural'      => trim((string)($d['label_mesa_plural']      ?? '')),
             'label_comanda_singular' => trim((string)($d['label_comanda_singular'] ?? '')),
             'label_comanda_plural'   => trim((string)($d['label_comanda_plural']   ?? '')),
         ];
-        // Vacio = default (ej. el usuario borra el campo intencionalmente para
-        // volver a "Mesa"). No tiramos error; solo aplicamos el default.
-        $keys = array_keys($vals);
-        foreach ($keys as $i => $k) {
-            if ($vals[$k] === '') $vals[$k] = $defaults[$i];
-            if (mb_strlen($vals[$k]) > 32) {
+
+        // Resolucion de vacios:
+        //   1. Si singular vacio       -> cae al default ("Mesa" o "Comanda").
+        //   2. Si plural vacio PERO singular lleno -> plural = singular + 's'
+        //      (ej. usuario escribe "Servicio" y nada mas -> plural = "Servicios").
+        //   3. Si plural vacio y singular tambien vacio -> plural cae al default.
+        // Esto evita que al escribir solo singular, el plural quede en "Mesas"
+        // y la UI muestre media mezcla.
+        if ($vals['label_mesa_singular'] === '')    $vals['label_mesa_singular']    = 'Mesa';
+        if ($vals['label_comanda_singular'] === '') $vals['label_comanda_singular'] = 'Comanda';
+        if ($vals['label_mesa_plural'] === '') {
+            $vals['label_mesa_plural'] = $vals['label_mesa_singular'] === 'Mesa'
+                ? 'Mesas'
+                : $vals['label_mesa_singular'] . 's';
+        }
+        if ($vals['label_comanda_plural'] === '') {
+            $vals['label_comanda_plural'] = $vals['label_comanda_singular'] === 'Comanda'
+                ? 'Comandas'
+                : $vals['label_comanda_singular'] . 's';
+        }
+        foreach ($vals as $v) {
+            if (mb_strlen($v) > 32) {
                 jsonResponse(['error' => true, 'message' => 'Cada label puede tener como maximo 32 caracteres'], 400);
             }
         }
