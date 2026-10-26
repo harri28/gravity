@@ -307,6 +307,18 @@ $_tema_oscuro = in_array($_brand['tema_oscuro'] ?? false, [true, 't', 1, '1'], t
     </div>
 </aside>
 
+<script>
+// Labels configurables de "Mesa" y "Comanda" por tenant (migration_64).
+// Cualquier modulo JS puede leer window.LABELS.mesa.{s,p} o .comanda.{s,p}
+// para renderizar la terminologia que el admin del tenant eligio.
+window.LABELS = {
+    mesa:    { s: <?= json_encode($_brand['label_mesa_singular']    ?? 'Mesa',     JSON_UNESCAPED_UNICODE) ?>,
+               p: <?= json_encode($_brand['label_mesa_plural']      ?? 'Mesas',    JSON_UNESCAPED_UNICODE) ?> },
+    comanda: { s: <?= json_encode($_brand['label_comanda_singular'] ?? 'Comanda',  JSON_UNESCAPED_UNICODE) ?>,
+               p: <?= json_encode($_brand['label_comanda_plural']   ?? 'Comandas', JSON_UNESCAPED_UNICODE) ?> },
+};
+</script>
+
 <?php if (isAdmin()): ?>
 <script>
 (function(){

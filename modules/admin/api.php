@@ -453,6 +453,75 @@ switch ($action) {
         registrarAuditoria('Cambio de estado de mesa', 'admin', "Mesa #{$mesa_row['numero']} | Activa: " . ($mesa_row['activa'] ? 'si' : 'no'));
         jsonResponse(['error' => false, 'activa' => $mesa_row['activa']]);
 
+    case 'labels_mesa_guardar':
+        // Guarda los 4 labels configurables de "Mesa"/"Comanda" para el tenant
+        // actual (migration_64). Un tenant restaurante puede dejarlo en
+        // "Mesa"/"Comanda"; una peluqueria lo cambia a "Estacion"/"Servicio";
+        // un spa a "Cabina"/"Sesion". Afecta solo UI/UX, nada de la DB.
+        $d = json_decode(file_get_contents('php://input'), true);
+        $defaults = ['Mesa', 'Mesas', 'Comanda', 'Comandas'];
+        $vals = [
+            'label_mesa_singular'    => trim((string)($d['label_mesa_singular']    ?? '')),
+            'label_mesa_plural'      => trim((string)($d['label_mesa_plural']      ?? '')),
+            'label_comanda_singular' => trim((string)($d['label_comanda_singular'] ?? '')),
+            'label_comanda_plural'   => trim((string)($d['label_comanda_plural']   ?? '')),
+        ];
+        // Vacio = default (ej. el usuario borra el campo intencionalmente para
+        // volver a "Mesa"). No tiramos error; solo aplicamos el default.
+        $keys = array_keys($vals);
+        foreach ($keys as $i => $k) {
+            if ($vals[$k] === '') $vals[$k] = $defaults[$i];
+            if (mb_strlen($vals[$k]) > 32) {
+                jsonResponse(['error' => true, 'message' => 'Cada label puede tener como maximo 32 caracteres'], 400);
+            }
+        }
+
+        $tid = sesionTenantId();
+        if (!$tid) {
+            jsonResponse(['error' => true, 'message' => 'Tenant no resuelto en la sesion'], 400);
+        }
+
+        // Upsert: si el tenant no tiene fila en tenant_config, la crea con
+        // defaults + los labels; si la tiene, actualiza solo los 4 labels.
+        $sql = "
+            INSERT INTO public.tenant_config (tenant_id, label_mesa_singular, label_mesa_plural, label_comanda_singular, label_comanda_plural)
+            VALUES (:tid, :ms, :mp, :cs, :cp)
+            ON CONFLICT (tenant_id) DO UPDATE SET
+                label_mesa_singular    = EXCLUDED.label_mesa_singular,
+                label_mesa_plural      = EXCLUDED.label_mesa_plural,
+                label_comanda_singular = EXCLUDED.label_comanda_singular,
+                label_comanda_plural   = EXCLUDED.label_comanda_plural,
+                updated_at             = NOW()
+        ";
+        $db->prepare($sql)->execute([
+            ':tid' => $tid,
+            ':ms'  => $vals['label_mesa_singular'],
+            ':mp'  => $vals['label_mesa_plural'],
+            ':cs'  => $vals['label_comanda_singular'],
+            ':cp'  => $vals['label_comanda_plural'],
+        ]);
+
+        registrarAuditoria('Cambio de labels mesa/comanda', 'admin',
+            "Mesa: {$vals['label_mesa_singular']}/{$vals['label_mesa_plural']} | Comanda: {$vals['label_comanda_singular']}/{$vals['label_comanda_plural']}");
+
+        jsonResponse(['error' => false, 'labels' => $vals, 'message' => 'Labels actualizados']);
+
+    case 'labels_mesa_get':
+        // Lectura de los labels actuales (para precargar el modal de config).
+        $tid = sesionTenantId();
+        $stmt = $db->prepare("
+            SELECT label_mesa_singular, label_mesa_plural, label_comanda_singular, label_comanda_plural
+              FROM public.tenant_config WHERE tenant_id = :tid
+        ");
+        $stmt->execute([':tid' => $tid]);
+        $row = $stmt->fetch();
+        jsonResponse(['error' => false, 'labels' => $row ?: [
+            'label_mesa_singular'    => 'Mesa',
+            'label_mesa_plural'      => 'Mesas',
+            'label_comanda_singular' => 'Comanda',
+            'label_comanda_plural'   => 'Comandas',
+        ]]);
+
     // ================================================================
     // CONFIGURACIÓN DE MARCA
     // ================================================================

@@ -176,19 +176,32 @@ function getTenantConfig(): array
     static $cfg = null;
     if ($cfg !== null) return $cfg;
 
+    $defaults = [
+        'nombre_sistema'         => 'Gravity',
+        'logo_path'              => null,
+        'tema_oscuro'            => false,
+        'label_mesa_singular'    => 'Mesa',
+        'label_mesa_plural'      => 'Mesas',
+        'label_comanda_singular' => 'Comanda',
+        'label_comanda_plural'   => 'Comandas',
+    ];
+
     $tid = sesionTenantId();
     if (!$tid) {
-        return $cfg = ['nombre_sistema' => 'Gravity', 'logo_path' => null, 'tema_oscuro' => false];
+        return $cfg = $defaults;
     }
     try {
         $stmt = getDB()->prepare(
-            "SELECT nombre_sistema, logo_path, COALESCE(tema_oscuro, FALSE) AS tema_oscuro FROM public.tenant_config WHERE tenant_id = :tid"
+            "SELECT nombre_sistema, logo_path, COALESCE(tema_oscuro, FALSE) AS tema_oscuro,
+                    label_mesa_singular, label_mesa_plural,
+                    label_comanda_singular, label_comanda_plural
+               FROM public.tenant_config WHERE tenant_id = :tid"
         );
         $stmt->execute([':tid' => $tid]);
         $row = $stmt->fetch();
-        $cfg = $row ?: ['nombre_sistema' => 'Gravity', 'logo_path' => null, 'tema_oscuro' => false];
+        $cfg = $row ? array_merge($defaults, $row) : $defaults;
     } catch (Exception $e) {
-        $cfg = ['nombre_sistema' => 'Gravity', 'logo_path' => null, 'tema_oscuro' => false];
+        $cfg = $defaults;
     }
     return $cfg;
 }

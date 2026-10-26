@@ -69,8 +69,14 @@ $mesaInfo = $mesaInfoSt->fetch() ?: ['numero' => '?', 'nombre' => '', 'capacidad
 $base_path      = '../../';
 $current_module = 'ventas';
 $current_page   = 'mesas';
-$page_title     = 'Mesa — Gravity';
-$breadcrumb     = '<a href="index.php" style="color:var(--text-muted);text-decoration:none">Mesas</a> / <strong>Mesa</strong>';
+
+// Labels configurables por tenant (migration_64).
+$_labels     = getTenantConfig();
+$L_mesa_s    = $_labels['label_mesa_singular'];
+$L_mesa_p    = $_labels['label_mesa_plural'];
+
+$page_title     = htmlspecialchars($L_mesa_s) . ' — Gravity';
+$breadcrumb     = '<a href="index.php" style="color:var(--text-muted);text-decoration:none">' . htmlspecialchars($L_mesa_p) . '</a> / <strong>' . htmlspecialchars($L_mesa_s) . '</strong>';
 $required_roles = ['admin', 'gerente', 'cajero'];
 
 include '../../includes/header.php';
@@ -78,13 +84,13 @@ include '../../includes/header.php';
 
 <div class="page-header">
     <div style="display:flex;align-items:center;gap:14px">
-        <a href="index.php" class="mesa-back-btn" title="Volver a Mesas">
+        <a href="index.php" class="mesa-back-btn" title="Volver a <?= htmlspecialchars($L_mesa_p) ?>">
             <i class="fas fa-arrow-left"></i>
         </a>
         <div>
             <div class="page-title" id="mesa-title">
                 <i class="fas fa-chair" style="color:var(--primary);margin-right:8px"></i>
-                Mesa <span id="mesa-num-txt">—</span>
+                <?= htmlspecialchars($L_mesa_s) ?> <span id="mesa-num-txt">—</span>
                 <small id="mesa-nom-txt" style="color:var(--text-muted);font-weight:500;font-size:.75em"></small>
             </div>
             <div class="page-subtitle">
@@ -501,7 +507,7 @@ function renderHeader() {
     document.getElementById('mesa-nom-txt').textContent = nombre ? ' — ' + nombre : '';
 
     if (!COMANDA) {
-        document.getElementById('mesa-mozo-txt').textContent = 'Mesa libre — agrega el primer producto para abrirla';
+        document.getElementById('mesa-mozo-txt').textContent = `${(window.LABELS?.mesa?.s || 'Mesa')} libre — agrega el primer producto para abrirla`;
         const crono = document.getElementById('mesa-crono');
         crono.textContent = '—';
         crono.dataset.crono = '';
@@ -1011,7 +1017,7 @@ async function confirmarVenta() {
     const idRef = d.numero_completo || d.numero_venta;
     const sunatSuffix = d.sunat_estado ? ` · SUNAT ${d.sunat_ok ? 'Aceptado' : d.sunat_estado}` : '';
     const vueltoSuffix = (d.vuelto > 0) ? ` · Vuelto ${soles(d.vuelto)}` : '';
-    const msg = `Mesa #${d.mesa_numero} cobrada · ${idRef}${sunatSuffix}${vueltoSuffix}`;
+    const msg = `${(window.LABELS?.mesa?.s || 'Mesa')} #${d.mesa_numero} cobrada · ${idRef}${sunatSuffix}${vueltoSuffix}`;
     sessionStorage.setItem('cobro_ok', msg);
     window.location = 'index.php';
 }

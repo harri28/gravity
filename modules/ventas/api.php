@@ -11,6 +11,12 @@ requireApiAuth();
 $action = $_GET['action'] ?? '';
 $db     = getDB();
 
+// Label configurable de "Mesa" (migration_64). Un restaurante lo deja en "Mesa";
+// una peluqueria lo renombra a "Estacion"; un spa a "Cabina". Los toasts y la
+// observacion por defecto en ventas usan este label. Los logs de auditoria
+// siguen con "Mesa" literal para mantener el historico coherente.
+$L_MESA_S = getTenantConfig()['label_mesa_singular'] ?? 'Mesa';
+
 function ventasMetaComprobante(string $tipo): array
 {
     switch ($tipo) {
@@ -418,7 +424,7 @@ function ventasCobrarComandaConSunat(
         ':tp'  => $tipoPago,
         ':tc'  => $tipoComp,
         ':vn'  => sesionNombre() ?: 'Operador',
-        ':ob'  => $observaciones !== '' ? $observaciones : "Mesa #{$comanda['mesa_num']}",
+        ':ob'  => $observaciones !== '' ? $observaciones : "{$L_MESA_S} #{$comanda['mesa_num']}",
         ':tdoc' => $tipoDocId,
         ':ctd' => $comprobanteMeta['codigo'],
         ':srie' => $serie,
@@ -647,7 +653,7 @@ switch ($action) {
             'error'         => false,
             'id'            => (int)$row['id'],
             'hora_apertura' => $row['hora_apertura'],
-            'message'       => "Mesa #{$mesa['numero']} abierta",
+            'message'       => "{$L_MESA_S} #{$mesa['numero']} abierta",
         ]);
 
     case 'comanda_detalle':
@@ -991,7 +997,7 @@ switch ($action) {
 
             jsonResponse([
                 'error'           => false,
-                'message'         => "Mesa #{$result['mesa_numero']} cobrada. {$result['numero_completo']}",
+                'message'         => "{$L_MESA_S} #{$result['mesa_numero']} cobrada. {$result['numero_completo']}",
                 'venta_id'        => $result['venta_id'],
                 'numero_venta'    => $result['numero_venta'],
                 'numero_completo' => $result['numero_completo'],
@@ -1080,7 +1086,7 @@ switch ($action) {
                 ':sub' => $total, ':tot' => $total,
                 ':tp' => $tipoPago, ':tc' => $tipoComp,
                 ':vu' => $vuelto,
-                ':ob' => $observac !== '' ? $observac : "Mesa #{$comanda['mesa_num']}",
+                ':ob' => $observac !== '' ? $observac : "{$L_MESA_S} #{$comanda['mesa_num']}",
                 ':vn' => sesionNombre(), ':cm' => $comandaId,
             ]);
             $venta = $vIns->fetch();
@@ -1133,7 +1139,7 @@ switch ($action) {
 
             jsonResponse([
                 'error'        => false,
-                'message'      => "Mesa #{$comanda['mesa_num']} cobrada. Venta {$numeroVenta}",
+                'message'      => "{$L_MESA_S} #{$comanda['mesa_num']} cobrada. Venta {$numeroVenta}",
                 'venta_id'     => (int) $venta['id'],
                 'numero_venta' => $numeroVenta,
                 'mesa_id'      => (int) $comanda['mesa_id'],

@@ -13,6 +13,13 @@ $page_title     = 'Administración — Gravity';
 $breadcrumb     = '<strong>Administración</strong>';
 $required_roles = ['admin', 'gerente'];
 
+// Labels configurables por tenant (migration_64).
+$_labels     = getTenantConfig();
+$L_mesa_s    = $_labels['label_mesa_singular'];
+$L_mesa_p    = $_labels['label_mesa_plural'];
+$L_comanda_s = $_labels['label_comanda_singular'];
+$L_comanda_p = $_labels['label_comanda_plural'];
+
 include '../../includes/header.php';
 ?>
 
@@ -34,7 +41,7 @@ include '../../includes/header.php';
         <i class="fas fa-store"></i> Sucursales
     </button>
     <button class="tab-btn" id="tab-mesas" onclick="switchTab('mesas')">
-        <i class="fas fa-chair"></i> Mesas
+        <i class="fas fa-chair"></i> <?= htmlspecialchars($L_mesa_p) ?>
     </button>
     <button class="tab-btn" id="tab-configuracion" onclick="switchTab('configuracion')">
         <i class="fas fa-paint-brush"></i> Configuración
@@ -116,14 +123,14 @@ include '../../includes/header.php';
     <div class="card">
         <div class="card-header">
             <div class="card-title">
-                <i class="fas fa-chair" style="color:var(--primary);margin-right:8px"></i>Mesas de la sucursal
+                <i class="fas fa-chair" style="color:var(--primary);margin-right:8px"></i><?= htmlspecialchars($L_mesa_p) ?> de la sucursal
             </div>
             <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="abrirModalMesa()">
-                <i class="fas fa-plus"></i> Nueva mesa
+                <i class="fas fa-plus"></i> Nueva <?= htmlspecialchars(mb_strtolower($L_mesa_s)) ?>
             </button>
         </div>
         <div style="padding:0 20px 10px;font-size:.8rem;color:var(--text-muted)">
-            Catalogo editable de mesas / salas donde se abren las comandas. Numero
+            Catalogo editable de <?= htmlspecialchars(mb_strtolower($L_mesa_p)) ?> / salas donde se abren las <?= htmlspecialchars(mb_strtolower($L_comanda_p)) ?>. Numero
             unico por sucursal; nombre y capacidad son opcionales.
         </div>
         <div class="table-wrap table-responsive">
@@ -151,7 +158,7 @@ include '../../includes/header.php';
 <div class="modal-overlay" id="modal-mesa">
     <div class="modal">
         <div class="modal-header">
-            <h3 class="modal-title" id="modal-mesa-titulo">Nueva mesa</h3>
+            <h3 class="modal-title" id="modal-mesa-titulo">Nueva <?= htmlspecialchars(mb_strtolower($L_mesa_s)) ?></h3>
             <button class="modal-close" onclick="closeModal('modal-mesa')"><i class="fas fa-times"></i></button>
         </div>
         <div class="modal-body">
@@ -1172,14 +1179,16 @@ function loadMesas() {
     fetch(BASE + 'modules/admin/api.php?action=mesas_listar')
         .then(r => r.json())
         .then(data => {
+            const Lp = (window.LABELS?.mesa?.p || 'Mesas').toLowerCase();
+            const Ls = (window.LABELS?.mesa?.s || 'Mesa');
             if (data.error || !Array.isArray(data)) {
                 document.getElementById('tbody-mesas').innerHTML =
-                    '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-chair"></i><br><br>Error al cargar mesas</td></tr>';
+                    `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-chair"></i><br><br>Error al cargar ${Lp}</td></tr>`;
                 return;
             }
             if (!data.length) {
                 document.getElementById('tbody-mesas').innerHTML =
-                    '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-chair"></i><br><br>No hay mesas registradas. Crea la primera con "Nueva mesa".</td></tr>';
+                    `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-chair"></i><br><br>No hay ${Lp} registradas. Crea la primera con "Nueva ${Ls.toLowerCase()}".</td></tr>`;
                 return;
             }
             document.getElementById('tbody-mesas').innerHTML = data.map(m => {
@@ -1205,25 +1214,28 @@ function loadMesas() {
             }).join('');
         })
         .catch(() => {
+            const Lp = (window.LABELS?.mesa?.p || 'Mesas').toLowerCase();
             document.getElementById('tbody-mesas').innerHTML =
-                '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-chair"></i><br><br>Error al cargar mesas</td></tr>';
-            showToast('Error al cargar mesas', 'error');
+                `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-chair"></i><br><br>Error al cargar ${Lp}</td></tr>`;
+            showToast(`Error al cargar ${Lp}`, 'error');
         });
 }
 
 function abrirModalMesa() {
-    document.getElementById('modal-mesa-titulo').textContent  = 'Nueva mesa';
+    const Ls = (window.LABELS?.mesa?.s || 'Mesa');
+    document.getElementById('modal-mesa-titulo').textContent  = `Nueva ${Ls.toLowerCase()}`;
     document.getElementById('m-id').value         = '';
     document.getElementById('m-numero').value     = '';
     document.getElementById('m-nombre').value     = '';
     document.getElementById('m-capacidad').value  = '';
-    document.getElementById('btn-guardar-mesa').innerHTML = '<i class="fas fa-save"></i> Crear mesa';
+    document.getElementById('btn-guardar-mesa').innerHTML = `<i class="fas fa-save"></i> Crear ${Ls.toLowerCase()}`;
     openModal('modal-mesa');
     setTimeout(() => document.getElementById('m-numero').focus(), 80);
 }
 
 function abrirEditarMesa(id, numero, nombre, capacidad) {
-    document.getElementById('modal-mesa-titulo').textContent  = 'Editar mesa';
+    const Ls = (window.LABELS?.mesa?.s || 'Mesa');
+    document.getElementById('modal-mesa-titulo').textContent  = `Editar ${Ls.toLowerCase()}`;
     document.getElementById('m-id').value        = id;
     document.getElementById('m-numero').value    = numero;
     document.getElementById('m-nombre').value    = nombre;
