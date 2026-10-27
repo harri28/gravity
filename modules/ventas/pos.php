@@ -2032,7 +2032,7 @@ function buildTicketHTML(opts) {
         </div>`;
     }).join('');
 
-    return `<div id="pos-ticket" style="font-family:'Arial Narrow',Arial,Helvetica,sans-serif;color:#000;font-size:10pt;line-height:1.4;width:100%;font-weight:600">
+    return `<div id="pos-ticket" style="font-family:'Arial Narrow',Arial,Helvetica,sans-serif;color:#000;font-size:10pt;line-height:1.5;width:100%;font-weight:500">
 
         <div style="text-align:center;margin-bottom:10px">
             ${EMPRESA_LOGO
@@ -2258,7 +2258,7 @@ function printReceipt(innerHtml, formato) {
            body{font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#111;padding:20mm 15mm}
            @media print{@page{size:A4;margin:15mm}body{padding:0}}`
         : `${PRINT_COMMON}
-           body{font-family:'Arial Narrow',Arial,Helvetica,sans-serif;font-size:9pt;font-weight:600;color:#000;width:80mm;margin:0 auto;padding:4mm 3mm}`;
+           body{font-family:'Arial Narrow',Arial,Helvetica,sans-serif;font-size:9pt;font-weight:500;line-height:1.5;color:#000;width:80mm;margin:0 auto;padding:4mm 3mm}`;
     const w = window.open('', '_blank', isA4 ? 'width=900,height=1000' : 'width=420,height=700');
     w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>${style}</style></head><body>${innerHtml}</body></html>`);
