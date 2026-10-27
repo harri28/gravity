@@ -2028,11 +2028,11 @@ function buildTicketHTML(opts) {
                 <span style="flex:1;padding-right:6px;word-break:break-word">${nombre}</span>
                 <span style="white-space:nowrap;font-weight:600">S/${sub}</span>
             </div>
-            <div style="font-size:8pt;color:#555;padding-left:2px">${qty} ${unidadLabel} x S/${pu.toFixed(2)}</div>
+            <div style="font-size:8pt;color:#000;padding-left:2px">${qty} ${unidadLabel} x S/${pu.toFixed(2)}</div>
         </div>`;
     }).join('');
 
-    return `<div id="pos-ticket" style="font-family:'Courier New',Courier,monospace;color:#000;font-size:10pt;line-height:1.5;width:100%">
+    return `<div id="pos-ticket" style="font-family:'Arial Narrow',Arial,Helvetica,sans-serif;color:#000;font-size:10pt;line-height:1.4;width:100%;font-weight:600">
 
         <div style="text-align:center;margin-bottom:10px">
             ${EMPRESA_LOGO
@@ -2099,7 +2099,7 @@ function buildTicketHTML(opts) {
         <div style="text-align:center;font-size:9pt;padding:4px 0">
             <div style="font-weight:700;letter-spacing:.02em">BIENES TRANSFERIDOS EN LA AMAZONÍA PARA</div>
             <div style="font-weight:700;letter-spacing:.02em">SER CONSUMIDOS EN LA MISMA</div>
-            ${preview ? `<div style="margin-top:8px;font-size:8pt;font-weight:700;color:#888;border:1px dashed #aaa;padding:2px 8px;display:inline-block">
+            ${preview ? `<div style="margin-top:8px;font-size:8pt;font-weight:700;color:#000;border:1px dashed #000;padding:2px 8px;display:inline-block">
                 ★ VISTA PREVIA — NO ES COMPROBANTE VÁLIDO ★</div>` : ''}
         </div>
         ${qrHTML}
@@ -2258,7 +2258,7 @@ function printReceipt(innerHtml, formato) {
            body{font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#111;padding:20mm 15mm}
            @media print{@page{size:A4;margin:15mm}body{padding:0}}`
         : `${PRINT_COMMON}
-           body{font-family:'Courier New',Courier,monospace;font-size:9pt;color:#000;width:80mm;margin:0 auto;padding:4mm 3mm}`;
+           body{font-family:'Arial Narrow',Arial,Helvetica,sans-serif;font-size:9pt;font-weight:600;color:#000;width:80mm;margin:0 auto;padding:4mm 3mm}`;
     const w = window.open('', '_blank', isA4 ? 'width=900,height=1000' : 'width=420,height=700');
     w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>${style}</style></head><body>${innerHtml}</body></html>`);

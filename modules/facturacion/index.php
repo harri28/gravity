@@ -821,7 +821,7 @@ html,body{
     -webkit-font-smoothing:none;
     text-rendering:geometricPrecision;
 }
-body{font-family:'Courier New',Courier,monospace;font-size:9pt;color:#000;width:80mm;margin:0 auto;padding:4mm 3mm}
+body{font-family:'Arial Narrow',Arial,Helvetica,sans-serif;font-size:9pt;font-weight:600;color:#000;width:80mm;margin:0 auto;padding:4mm 3mm}
 img{image-rendering:-webkit-optimize-contrast}
 @media print{@page{size:80mm auto;margin:4mm 3mm}body{padding:0}}
 </style></head>
@@ -1347,9 +1347,9 @@ function rptBuildTicketHtml(data) {
         const nombre=it.nombre||it.producto_nombre||it.descripcion||'Producto';
         const qty=parseFloat(it.cantidad||it.qty||0)||0, pu=parseFloat(it.precio_unitario||it.precio||0)||0;
         const sub=parseFloat(it.precio_total||it.subtotal||0)||(pu*qty);
-        return `<div style="margin-bottom:5px"><div style="display:flex;justify-content:space-between;font-size:9pt"><span style="flex:1;padding-right:6px;word-break:break-word">${esc(nombre)}</span><span style="white-space:nowrap;font-weight:600">S/${sub.toFixed(2)}</span></div><div style="font-size:8pt;color:#555;padding-left:2px">${qty} unid. x S/${pu.toFixed(2)}</div></div>`;
+        return `<div style="margin-bottom:5px"><div style="display:flex;justify-content:space-between;font-size:9pt"><span style="flex:1;padding-right:6px;word-break:break-word">${esc(nombre)}</span><span style="white-space:nowrap;font-weight:700">S/${sub.toFixed(2)}</span></div><div style="font-size:8pt;color:#000;padding-left:2px">${qty} unid. x S/${pu.toFixed(2)}</div></div>`;
     }).join('');
-    return `<div style="font-family:'Courier New',Courier,monospace;color:#000;font-size:10pt;line-height:1.5;width:100%">
+    return `<div style="font-family:'Arial Narrow',Arial,Helvetica,sans-serif;color:#000;font-size:10pt;line-height:1.4;width:100%;font-weight:600">
         <div style="text-align:center;margin-bottom:10px">
             <div style="font-size:12pt;font-weight:900;letter-spacing:1px;text-transform:uppercase">${esc(EMPRESA_NOMBRE||'FARMACIA')}</div>
             ${EMPRESA_RUC?`<div style="font-size:9pt">RUC: ${esc(EMPRESA_RUC)}</div>`:''}
@@ -1571,7 +1571,7 @@ function ncBuildTicketHtml(row) {
     const clienteDoc=row.ruc||row.dni||'', ref=row.referencia_numero_completo||row.documento_modificado_numero_completo||'-';
     const motivo=row.motivo_nota_credito||row.motivo_descripcion||row.motivo||'', tipo=row.codigo_tipo_nota_credito||row.tipo_codigo||'';
     const numero=row.numero_completo||row.serie||'NC';
-    return `<div style="font-family:'Courier New',Courier,monospace;color:#000;font-size:10pt;line-height:1.5;width:100%">
+    return `<div style="font-family:'Arial Narrow',Arial,Helvetica,sans-serif;color:#000;font-size:10pt;line-height:1.4;width:100%;font-weight:600">
         <div style="text-align:center;margin-bottom:10px">
             <div style="font-size:12pt;font-weight:900;text-transform:uppercase">${esc(EMPRESA_NOMBRE||'FARMACIA')}</div>
             ${EMPRESA_RUC?`<div style="font-size:9pt">RUC: ${esc(EMPRESA_RUC)}</div>`:''}
