@@ -2003,15 +2003,15 @@ function buildTicketHTML(opts) {
     const qrDataUri = comprobante_url ? generarQrDataUri(comprobante_url, 156) : '';
     const qrHTML = (comprobante_url && qrDataUri) ? `
         <div style="display:flex;align-items:center;margin-top:8px">
-            <div style="width:40%"><img src="${qrDataUri}" style="width:100%;max-width:83px;height:auto;display:block"></div>
-            <div style="width:60%;padding-left:6px;font-size:8px;line-height:1.35;word-break:break-all">Consulta tu comprobante:<br>${comprobante_url}</div>
+            <div style="width:40%"><img src="${qrDataUri}" style="width:100%;max-width:83px;height:auto;display:block;image-rendering:pixelated"></div>
+            <div style="width:60%;padding-left:6px;font-size:8pt;line-height:1.35;word-break:break-all">Consulta tu comprobante:<br>${comprobante_url}</div>
         </div>` : '';
 
     const sep = (double = false) =>
         `<div style="border-top:${double ? '2px solid' : '1px dashed'} #000;margin:6px 0"></div>`;
 
     const row2 = (l, r, opts2 = {}) => {
-        const sz   = opts2.big  ? '14px' : '11px';
+        const sz   = opts2.big  ? '11pt' : '9pt';
         const fw   = opts2.bold ? '800'  : '400';
         return `<div style="display:flex;justify-content:space-between;font-size:${sz};font-weight:${fw};line-height:1.6">
             <span>${l}</span><span>${r}</span></div>`;
@@ -2024,33 +2024,33 @@ function buildTicketHTML(opts) {
         const sub    = parseFloat(i.precio_total || (pu * qty)).toFixed(2);
         const unidadLabel = i.unidad_medida_vendida || 'unid.';
         return `<div style="margin-bottom:5px">
-            <div style="display:flex;justify-content:space-between;font-size:11px">
+            <div style="display:flex;justify-content:space-between;font-size:9pt">
                 <span style="flex:1;padding-right:6px;word-break:break-word">${nombre}</span>
                 <span style="white-space:nowrap;font-weight:600">S/${sub}</span>
             </div>
-            <div style="font-size:10px;color:#555;padding-left:2px">${qty} ${unidadLabel} x S/${pu.toFixed(2)}</div>
+            <div style="font-size:8pt;color:#555;padding-left:2px">${qty} ${unidadLabel} x S/${pu.toFixed(2)}</div>
         </div>`;
     }).join('');
 
-    return `<div id="pos-ticket" style="font-family:'Courier New',Courier,monospace;color:#000;font-size:12px;line-height:1.5;width:100%">
+    return `<div id="pos-ticket" style="font-family:'Courier New',Courier,monospace;color:#000;font-size:10pt;line-height:1.5;width:100%">
 
         <div style="text-align:center;margin-bottom:10px">
             ${EMPRESA_LOGO
-                ? `<div style="margin-bottom:4px"><img src="${EMPRESA_LOGO}" style="max-width:160px;max-height:80px;object-fit:contain"></div>`
-                : `<div style="font-size:15px;font-weight:900;letter-spacing:1px;text-transform:uppercase">${EMPRESA_NOMBRE || 'FARMACIA'}</div>`
+                ? `<div style="margin-bottom:4px"><img src="${EMPRESA_LOGO}" style="max-width:160px;max-height:80px;object-fit:contain;image-rendering:-webkit-optimize-contrast"></div>`
+                : `<div style="font-size:12pt;font-weight:900;letter-spacing:1px;text-transform:uppercase">${EMPRESA_NOMBRE || 'FARMACIA'}</div>`
             }
-            ${EMPRESA_RUC     ? `<div style="font-size:11px">RUC: ${EMPRESA_RUC}</div>` : ''}
-            ${SUCURSAL_NOMBRE ? `<div style="font-size:11px;font-weight:600">${SUCURSAL_NOMBRE}</div>` : ''}
-            ${EMPRESA_DIR     ? `<div style="font-size:10px">${EMPRESA_DIR}</div>` : ''}
-            ${EMPRESA_TEL     ? `<div style="font-size:10px">Tel: ${EMPRESA_TEL}</div>` : ''}
+            ${EMPRESA_RUC     ? `<div style="font-size:9pt">RUC: ${EMPRESA_RUC}</div>` : ''}
+            ${SUCURSAL_NOMBRE ? `<div style="font-size:9pt;font-weight:600">${SUCURSAL_NOMBRE}</div>` : ''}
+            ${EMPRESA_DIR     ? `<div style="font-size:8pt">${EMPRESA_DIR}</div>` : ''}
+            ${EMPRESA_TEL     ? `<div style="font-size:8pt">Tel: ${EMPRESA_TEL}</div>` : ''}
         </div>
 
         <div style="border-top:2px solid #000;border-bottom:2px solid #000;text-align:center;padding:5px 0;margin-bottom:8px">
-            <div style="font-size:11px;font-weight:700">${compLabel}</div>
-            <div style="font-size:11px">${numComp}</div>
+            <div style="font-size:9pt;font-weight:700">${compLabel}</div>
+            <div style="font-size:9pt">${numComp}</div>
         </div>
 
-        <div style="font-size:11px;margin-bottom:6px">
+        <div style="font-size:9pt;margin-bottom:6px">
             <div>Fecha   : ${fecha} ${hora}</div>
             <div>Cajero  : ${VENDEDOR_NOMBRE}</div>
             ${nombreCliente               ? `<div>Cliente : ${nombreCliente}</div>`  : ''}
@@ -2060,14 +2060,14 @@ function buildTicketHTML(opts) {
         </div>
 
         ${sep()}
-        <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;margin-bottom:3px">
+        <div style="display:flex;justify-content:space-between;font-size:9pt;font-weight:700;margin-bottom:3px">
             <span>DESCRIPCIÓN</span><span>TOTAL</span>
         </div>
         ${sep()}
         <div style="margin-bottom:4px">${itemsHTML}</div>
         ${sep()}
 
-        <div style="font-size:11px;margin:4px 0">
+        <div style="font-size:9pt;margin:4px 0">
             ${row2('OP. GRAVADA:', `S/ ${parseFloat(gravada).toFixed(2)}`)}
             ${parseFloat(exonerada) > 0 ? row2('OP. EXONERADA:', `S/ ${parseFloat(exonerada).toFixed(2)}`) : ''}
             ${parseFloat(inafecta) > 0 ? row2('OP. INAFECTA:', `S/ ${parseFloat(inafecta).toFixed(2)}`) : ''}
@@ -2078,7 +2078,7 @@ function buildTicketHTML(opts) {
         ${row2('TOTAL:', `S/ ${total.toFixed(2)}`, {bold:true, big:true})}
         ${sep(true)}
 
-        <div style="font-size:11px;margin-top:5px">
+        <div style="font-size:9pt;margin-top:5px">
             ${tipo_pago === 'credito' && Array.isArray(cuotas) && cuotas.length
                 ? [
                     row2('CRÉDITO:', `S/ ${parseFloat(total).toFixed(2)}`),
@@ -2096,10 +2096,10 @@ function buildTicketHTML(opts) {
         </div>
 
         ${sep()}
-        <div style="text-align:center;font-size:11px;padding:4px 0">
+        <div style="text-align:center;font-size:9pt;padding:4px 0">
             <div style="font-weight:700;letter-spacing:.02em">BIENES TRANSFERIDOS EN LA AMAZONÍA PARA</div>
             <div style="font-weight:700;letter-spacing:.02em">SER CONSUMIDOS EN LA MISMA</div>
-            ${preview ? `<div style="margin-top:8px;font-size:10px;font-weight:700;color:#888;border:1px dashed #aaa;padding:2px 8px;display:inline-block">
+            ${preview ? `<div style="margin-top:8px;font-size:8pt;font-weight:700;color:#888;border:1px dashed #aaa;padding:2px 8px;display:inline-block">
                 ★ VISTA PREVIA — NO ES COMPROBANTE VÁLIDO ★</div>` : ''}
         </div>
         ${qrHTML}
@@ -2132,8 +2132,8 @@ function buildTicketA4HTML(opts) {
     const qrDataUriA4 = comprobante_url ? generarQrDataUri(comprobante_url, 208) : '';
     const qrHTMLA4 = (comprobante_url && qrDataUriA4) ? `
         <div style="display:flex;align-items:center;margin-top:14px">
-            <div style="width:40%"><img src="${qrDataUriA4}" style="width:100%;max-width:117px;height:auto;display:block"></div>
-            <div style="width:60%;padding-left:10px;font-size:10px;color:#555;line-height:1.4;word-break:break-all">Escanea o visita este enlace para ver tu comprobante:<br><span style="color:#4f46e5">${comprobante_url}</span></div>
+            <div style="width:40%"><img src="${qrDataUriA4}" style="width:100%;max-width:117px;height:auto;display:block;image-rendering:pixelated"></div>
+            <div style="width:60%;padding-left:10px;font-size:8pt;color:#555;line-height:1.4;word-break:break-all">Escanea o visita este enlace para ver tu comprobante:<br><span style="color:#4f46e5">${comprobante_url}</span></div>
         </div>` : '';
 
     const itemsHTML = items.map((i, idx) => {
@@ -2157,12 +2157,12 @@ function buildTicketA4HTML(opts) {
             ? payment_breakdown.map(p => `<tr><td style="padding:4px 10px">${(PAGOS[(p.method || '').toLowerCase()] || p.method || 'Pago')}</td><td style="padding:4px 10px;text-align:right">S/ ${parseFloat(p.amount || 0).toFixed(2)}</td></tr>`).join('')
             : `<tr><td style="padding:4px 10px">${pagoLabel}</td><td style="padding:4px 10px;text-align:right">S/ ${parseFloat(monto_recibido).toFixed(2)}</td></tr>`);
 
-    return `<div id="pos-ticket-a4" style="font-family:Arial,sans-serif;color:#111;font-size:12px">
+    return `<div id="pos-ticket-a4" style="font-family:Arial,sans-serif;color:#111;font-size:10pt">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">
             <div>
                 ${EMPRESA_LOGO
-                    ? `<img src="${EMPRESA_LOGO}" style="max-width:180px;max-height:70px;object-fit:contain;margin-bottom:6px">`
-                    : `<div style="font-size:18px;font-weight:700">${EMPRESA_NOMBRE || 'FARMACIA'}</div>`
+                    ? `<img src="${EMPRESA_LOGO}" style="max-width:180px;max-height:70px;object-fit:contain;margin-bottom:6px;image-rendering:-webkit-optimize-contrast">`
+                    : `<div style="font-size:14pt;font-weight:700">${EMPRESA_NOMBRE || 'FARMACIA'}</div>`
                 }
                 ${EMPRESA_RUC     ? `<div style="color:#555">RUC: ${EMPRESA_RUC}</div>` : ''}
                 ${SUCURSAL_NOMBRE ? `<div style="color:#555;font-weight:600">${SUCURSAL_NOMBRE}</div>` : ''}
@@ -2170,10 +2170,10 @@ function buildTicketA4HTML(opts) {
                 ${EMPRESA_TEL     ? `<div style="color:#555">Tel: ${EMPRESA_TEL}</div>` : ''}
             </div>
             <div style="text-align:right">
-                <div style="font-size:16px;font-weight:700;color:#4f46e5">${compLabel}</div>
-                <div style="font-size:14px;color:#333">${numComp}</div>
-                <div style="font-size:11px;color:#888;margin-top:4px">Fecha: ${fecha} ${hora}</div>
-                <div style="font-size:11px;color:#888">Cajero: ${VENDEDOR_NOMBRE}</div>
+                <div style="font-size:13pt;font-weight:700;color:#4f46e5">${compLabel}</div>
+                <div style="font-size:11pt;color:#333">${numComp}</div>
+                <div style="font-size:9pt;color:#888;margin-top:4px">Fecha: ${fecha} ${hora}</div>
+                <div style="font-size:9pt;color:#888">Cajero: ${VENDEDOR_NOMBRE}</div>
             </div>
         </div>
 
@@ -2208,7 +2208,7 @@ function buildTicketA4HTML(opts) {
                 ${parseFloat(inafecta) > 0 ? `<tr><td style="padding:4px 10px">Op. Inafecta:</td><td style="padding:4px 10px;text-align:right">S/ ${parseFloat(inafecta).toFixed(2)}</td></tr>` : ''}
                 <tr><td style="padding:4px 10px">IGV (18%):</td><td style="padding:4px 10px;text-align:right">S/ ${igv.toFixed(2)}</td></tr>
                 ${descuento > 0 ? `<tr><td style="padding:4px 10px">Descuento:</td><td style="padding:4px 10px;text-align:right">-S/ ${parseFloat(descuento).toFixed(2)}</td></tr>` : ''}
-                <tr><td style="padding:8px 10px;font-weight:700;font-size:14px;border-top:1.5px solid #111">Total:</td><td style="padding:8px 10px;text-align:right;font-weight:700;font-size:14px;border-top:1.5px solid #111">S/ ${total.toFixed(2)}</td></tr>
+                <tr><td style="padding:8px 10px;font-weight:700;font-size:11pt;border-top:1.5px solid #111">Total:</td><td style="padding:8px 10px;text-align:right;font-weight:700;font-size:11pt;border-top:1.5px solid #111">S/ ${total.toFixed(2)}</td></tr>
             </table>
         </div>
 
@@ -2219,7 +2219,7 @@ function buildTicketA4HTML(opts) {
             </table>
         </div>
 
-        <div style="text-align:center;font-size:10px;color:#555;border-top:1px solid #e5e7eb;padding-top:10px">
+        <div style="text-align:center;font-size:8pt;color:#555;border-top:1px solid #e5e7eb;padding-top:10px">
             <div style="font-weight:700">BIENES TRANSFERIDOS EN LA AMAZONÍA PARA</div>
             <div style="font-weight:700">SER CONSUMIDOS EN LA MISMA</div>
             ${preview ? `<div style="margin-top:8px;font-weight:700;color:#888;border:1px dashed #aaa;padding:2px 8px;display:inline-block">★ VISTA PREVIA — NO ES COMPROBANTE VÁLIDO ★</div>` : ''}
@@ -2236,9 +2236,29 @@ function buildComprobanteHTML(opts) {
 function printReceipt(innerHtml, formato) {
     formato = formato || document.getElementById('tipo-impresion')?.value || 'ticket';
     const isA4 = formato === 'a4';
+    // Reglas clave anti-borroso para impresion en Chrome:
+    //  - -webkit-print-color-adjust/print-color-adjust: exact  -> Chrome no aclara negros
+    //  - -webkit-font-smoothing:none; text-rendering:geometricPrecision -> desactiva
+    //    el suavizado de sub-pixel que se ve bien en pantalla pero sale lavado en papel
+    //  - image-rendering:-webkit-optimize-contrast -> interpolacion mas nitida de PNGs
+    //    (logo + QR). Para el QR usamos crisp-edges porque es imagen binaria.
+    //  - Tamanos en pt (no px) -> unidad fisica, no depende del zoom del navegador.
+    const PRINT_COMMON = `
+        *{margin:0;padding:0;box-sizing:border-box}
+        html,body{
+            -webkit-print-color-adjust:exact !important;
+            print-color-adjust:exact !important;
+            -webkit-font-smoothing:none;
+            text-rendering:geometricPrecision;
+        }
+        img{image-rendering:-webkit-optimize-contrast}
+    `;
     const style = isA4
-        ? `* { margin:0; padding:0; box-sizing:border-box; } body { font-family:Arial,sans-serif; font-size:12px; color:#111; padding:20mm 15mm; } @media print { @page { size:A4; margin:15mm; } body { padding:0; } }`
-        : `* { margin:0; padding:0; box-sizing:border-box; } body { font-family:'Courier New',Courier,monospace; font-size:12px; color:#000; width:80mm; margin:0 auto; padding:4mm 3mm; }`;
+        ? `${PRINT_COMMON}
+           body{font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#111;padding:20mm 15mm}
+           @media print{@page{size:A4;margin:15mm}body{padding:0}}`
+        : `${PRINT_COMMON}
+           body{font-family:'Courier New',Courier,monospace;font-size:9pt;color:#000;width:80mm;margin:0 auto;padding:4mm 3mm}`;
     const w = window.open('', '_blank', isA4 ? 'width=900,height=1000' : 'width=420,height=700');
     w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>${style}</style></head><body>${innerHtml}</body></html>`);

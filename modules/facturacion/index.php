@@ -807,10 +807,24 @@ function actionIconButton(icon, title, href = null, onclick = null) {
 function openPrintWindow(title, contentHtml) {
     const w = window.open('', '_blank', 'width=420,height=700');
     if (!w) return;
+    // Reglas anti-borroso para impresion en Chrome (ver pos.php:printReceipt):
+    // pt en vez de px, print-color-adjust:exact, font-smoothing:none,
+    // image-rendering:optimize-contrast. Sin esto Chrome aplica sub-pixel
+    // antialiasing que la impresora termica interpreta como glifo lavado.
     w.document.open();
     w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${esc(title)}</title>
-<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',Courier,monospace;font-size:12px;color:#000;width:80mm;margin:0 auto;padding:4mm 3mm}
-@media print{@page{size:80mm auto;margin:4mm 3mm}body{padding:0}}</style></head>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{
+    -webkit-print-color-adjust:exact !important;
+    print-color-adjust:exact !important;
+    -webkit-font-smoothing:none;
+    text-rendering:geometricPrecision;
+}
+body{font-family:'Courier New',Courier,monospace;font-size:9pt;color:#000;width:80mm;margin:0 auto;padding:4mm 3mm}
+img{image-rendering:-webkit-optimize-contrast}
+@media print{@page{size:80mm auto;margin:4mm 3mm}body{padding:0}}
+</style></head>
 <body>${contentHtml}<script>setTimeout(()=>{window.print();},250);<\/script></body></html>`);
     w.document.close();
 }
@@ -1333,39 +1347,39 @@ function rptBuildTicketHtml(data) {
         const nombre=it.nombre||it.producto_nombre||it.descripcion||'Producto';
         const qty=parseFloat(it.cantidad||it.qty||0)||0, pu=parseFloat(it.precio_unitario||it.precio||0)||0;
         const sub=parseFloat(it.precio_total||it.subtotal||0)||(pu*qty);
-        return `<div style="margin-bottom:5px"><div style="display:flex;justify-content:space-between;font-size:11px"><span style="flex:1;padding-right:6px;word-break:break-word">${esc(nombre)}</span><span style="white-space:nowrap;font-weight:600">S/${sub.toFixed(2)}</span></div><div style="font-size:10px;color:#555;padding-left:2px">${qty} unid. x S/${pu.toFixed(2)}</div></div>`;
+        return `<div style="margin-bottom:5px"><div style="display:flex;justify-content:space-between;font-size:9pt"><span style="flex:1;padding-right:6px;word-break:break-word">${esc(nombre)}</span><span style="white-space:nowrap;font-weight:600">S/${sub.toFixed(2)}</span></div><div style="font-size:8pt;color:#555;padding-left:2px">${qty} unid. x S/${pu.toFixed(2)}</div></div>`;
     }).join('');
-    return `<div style="font-family:'Courier New',Courier,monospace;color:#000;font-size:12px;line-height:1.5;width:100%">
+    return `<div style="font-family:'Courier New',Courier,monospace;color:#000;font-size:10pt;line-height:1.5;width:100%">
         <div style="text-align:center;margin-bottom:10px">
-            <div style="font-size:15px;font-weight:900;letter-spacing:1px;text-transform:uppercase">${esc(EMPRESA_NOMBRE||'FARMACIA')}</div>
-            ${EMPRESA_RUC?`<div style="font-size:11px">RUC: ${esc(EMPRESA_RUC)}</div>`:''}
-            ${SUCURSAL_NOMBRE?`<div style="font-size:11px;font-weight:600">${esc(SUCURSAL_NOMBRE)}</div>`:''}
-            ${EMPRESA_DIR?`<div style="font-size:10px">${esc(EMPRESA_DIR)}</div>`:''}
-            ${EMPRESA_TEL?`<div style="font-size:10px">Tel: ${esc(EMPRESA_TEL)}</div>`:''}
+            <div style="font-size:12pt;font-weight:900;letter-spacing:1px;text-transform:uppercase">${esc(EMPRESA_NOMBRE||'FARMACIA')}</div>
+            ${EMPRESA_RUC?`<div style="font-size:9pt">RUC: ${esc(EMPRESA_RUC)}</div>`:''}
+            ${SUCURSAL_NOMBRE?`<div style="font-size:9pt;font-weight:600">${esc(SUCURSAL_NOMBRE)}</div>`:''}
+            ${EMPRESA_DIR?`<div style="font-size:8pt">${esc(EMPRESA_DIR)}</div>`:''}
+            ${EMPRESA_TEL?`<div style="font-size:8pt">Tel: ${esc(EMPRESA_TEL)}</div>`:''}
         </div>
         <div style="border-top:2px solid #000;border-bottom:2px solid #000;text-align:center;padding:5px 0;margin-bottom:8px">
-            <div style="font-size:11px;font-weight:700">${compLabel}</div><div style="font-size:11px">${esc(compNumero)}</div>
+            <div style="font-size:9pt;font-weight:700">${compLabel}</div><div style="font-size:9pt">${esc(compNumero)}</div>
         </div>
-        <div style="font-size:11px;margin-bottom:6px">
+        <div style="font-size:9pt;margin-bottom:6px">
             <div>Fecha : ${fecha} ${hora}</div>
             <div>Cajero: ${esc(data.vendedor||VENDEDOR_NOMBRE)}</div>
             ${data.cliente?`<div>Cliente: ${esc(data.cliente)}</div>`:''}
             ${data.ruc?`<div>RUC: ${esc(data.ruc)}</div>`:data.dni?`<div>DNI: ${esc(data.dni)}</div>`:''}
         </div>
         <div style="border-top:1px dashed #000;margin:6px 0"></div>
-        <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;margin-bottom:3px"><span>DESCRIPCIÓN</span><span>TOTAL</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:9pt;font-weight:700;margin-bottom:3px"><span>DESCRIPCIÓN</span><span>TOTAL</span></div>
         <div style="border-top:1px dashed #000;margin:6px 0"></div>
         <div style="margin-bottom:4px">${itemsHtml}</div>
         <div style="border-top:1px dashed #000;margin:6px 0"></div>
-        <div style="font-size:11px;margin:4px 0">
+        <div style="font-size:9pt;margin:4px 0">
             <div style="display:flex;justify-content:space-between;gap:10px"><span>OP. GRAVADA:</span><span>S/ ${subtotal.toFixed(2)}</span></div>
             ${descuento>0?`<div style="display:flex;justify-content:space-between;gap:10px"><span>DESCUENTO:</span><span>-S/ ${descuento.toFixed(2)}</span></div>`:''}
             <div style="display:flex;justify-content:space-between;gap:10px"><span>IGV (18%):</span><span>S/ ${igv.toFixed(2)}</span></div>
         </div>
         <div style="border-top:2px solid #000;margin:6px 0"></div>
-        <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:800;line-height:1.6"><span>TOTAL:</span><span>S/ ${total.toFixed(2)}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:11pt;font-weight:800;line-height:1.6"><span>TOTAL:</span><span>S/ ${total.toFixed(2)}</span></div>
         <div style="border-top:2px solid #000;margin:6px 0"></div>
-        <div style="text-align:center;font-size:11px;padding:4px 0;font-weight:700;letter-spacing:.02em"><div>BIENES TRANSFERIDOS EN LA AMAZONÍA PARA</div><div>SER CONSUMIDOS EN LA MISMA</div></div>
+        <div style="text-align:center;font-size:9pt;padding:4px 0;font-weight:700;letter-spacing:.02em"><div>BIENES TRANSFERIDOS EN LA AMAZONÍA PARA</div><div>SER CONSUMIDOS EN LA MISMA</div></div>
     </div>`;
 }
 
@@ -1557,29 +1571,29 @@ function ncBuildTicketHtml(row) {
     const clienteDoc=row.ruc||row.dni||'', ref=row.referencia_numero_completo||row.documento_modificado_numero_completo||'-';
     const motivo=row.motivo_nota_credito||row.motivo_descripcion||row.motivo||'', tipo=row.codigo_tipo_nota_credito||row.tipo_codigo||'';
     const numero=row.numero_completo||row.serie||'NC';
-    return `<div style="font-family:'Courier New',Courier,monospace;color:#000;font-size:12px;line-height:1.5;width:100%">
+    return `<div style="font-family:'Courier New',Courier,monospace;color:#000;font-size:10pt;line-height:1.5;width:100%">
         <div style="text-align:center;margin-bottom:10px">
-            <div style="font-size:15px;font-weight:900;text-transform:uppercase">${esc(EMPRESA_NOMBRE||'FARMACIA')}</div>
-            ${EMPRESA_RUC?`<div style="font-size:11px">RUC: ${esc(EMPRESA_RUC)}</div>`:''}
-            ${SUCURSAL_NOMBRE?`<div style="font-size:11px;font-weight:600">${esc(SUCURSAL_NOMBRE)}</div>`:''}
+            <div style="font-size:12pt;font-weight:900;text-transform:uppercase">${esc(EMPRESA_NOMBRE||'FARMACIA')}</div>
+            ${EMPRESA_RUC?`<div style="font-size:9pt">RUC: ${esc(EMPRESA_RUC)}</div>`:''}
+            ${SUCURSAL_NOMBRE?`<div style="font-size:9pt;font-weight:600">${esc(SUCURSAL_NOMBRE)}</div>`:''}
         </div>
         <div style="border-top:2px solid #000;border-bottom:2px solid #000;text-align:center;padding:5px 0;margin-bottom:8px">
-            <div style="font-size:11px;font-weight:700">NOTA DE CRÉDITO</div><div style="font-size:11px">${esc(numero)}</div>
+            <div style="font-size:9pt;font-weight:700">NOTA DE CRÉDITO</div><div style="font-size:9pt">${esc(numero)}</div>
         </div>
-        <div style="font-size:11px;margin-bottom:6px">
+        <div style="font-size:9pt;margin-bottom:6px">
             <div>Fecha : ${fecha} ${hora}</div><div>Cliente: ${esc(cliente)}</div>
             ${clienteDoc?`<div>${row.ruc?'RUC':'DNI'}: ${esc(clienteDoc)}</div>`:''}
             <div>Ref.: ${esc(ref)}</div>
         </div>
         <div style="border-top:2px solid #000;margin:6px 0"></div>
-        <div style="font-size:11px;margin:4px 0">
+        <div style="font-size:9pt;margin:4px 0">
             <div style="display:flex;justify-content:space-between;gap:10px"><span>MOTIVO:</span><span>${esc(motivo||'Anulación de la operación')}</span></div>
             <div style="display:flex;justify-content:space-between;gap:10px"><span>TIPO:</span><span>${esc(tipo)}</span></div>
         </div>
         <div style="border-top:2px solid #000;margin:6px 0"></div>
-        <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:800"><span>TOTAL:</span><span>S/ ${total.toFixed(2)}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:11pt;font-weight:800"><span>TOTAL:</span><span>S/ ${total.toFixed(2)}</span></div>
         <div style="border-top:2px solid #000;margin:6px 0"></div>
-        <div style="text-align:center;font-size:11px;padding:4px 0;font-weight:700;letter-spacing:.02em"><div>BIENES TRANSFERIDOS EN LA AMAZONÍA PARA</div><div>SER CONSUMIDOS EN LA MISMA</div></div>
+        <div style="text-align:center;font-size:9pt;padding:4px 0;font-weight:700;letter-spacing:.02em"><div>BIENES TRANSFERIDOS EN LA AMAZONÍA PARA</div><div>SER CONSUMIDOS EN LA MISMA</div></div>
     </div>`;
 }
 
