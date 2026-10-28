@@ -924,6 +924,248 @@ switch ($action) {
             jsonResponse(['error' => true, 'message' => 'Error al quitar item: ' . $e->getMessage()], 500);
         }
 
+    case 'comanda_mover_item':
+        // Mueve la linea completa a otra mesa. Si la destino esta libre, abre
+        // una comanda nueva ahi. Si ya tiene comanda y la linea matchea con
+        // alguna existente (mismo producto/unidad/notas/precio) se consolida.
+        // Si al mover queda la origen sin items, se cierra como anulada.
+        $d             = json_decode(file_get_contents('php://input'), true);
+        $itemId        = intval($d['item_id']          ?? 0);
+        $mesaDestinoId = intval($d['mesa_destino_id']  ?? 0);
+        if (!$itemId || !$mesaDestinoId) {
+            jsonResponse(['error' => true, 'message' => 'Datos incompletos'], 400);
+        }
+
+        try {
+            $db->beginTransaction();
+
+            $itSt = $db->prepare("
+                SELECT ci.id, ci.comanda_id, ci.producto_id, ci.cantidad,
+                       ci.precio_unitario, ci.unidad_medida, ci.notas,
+                       c.mesa_id AS mesa_origen_id
+                FROM comanda_items ci
+                JOIN comandas c ON c.id = ci.comanda_id
+                WHERE ci.id = :id AND c.estado = 'abierta'
+                FOR UPDATE
+            ");
+            $itSt->execute([':id' => $itemId]);
+            $item = $itSt->fetch();
+            if (!$item) {
+                $db->rollBack();
+                jsonResponse(['error' => true, 'message' => 'Item no encontrado o comanda ya cerrada'], 404);
+            }
+            $comandaOrigenId = (int)$item['comanda_id'];
+
+            if ((int)$item['mesa_origen_id'] === $mesaDestinoId) {
+                $db->rollBack();
+                jsonResponse(['error' => true, 'message' => 'La mesa destino es la misma que la origen'], 400);
+            }
+
+            $mSt = $db->prepare("SELECT id, numero, activa FROM mesas WHERE id = :id");
+            $mSt->execute([':id' => $mesaDestinoId]);
+            $mesaDest = $mSt->fetch();
+            if (!$mesaDest) {
+                $db->rollBack();
+                jsonResponse(['error' => true, 'message' => 'Mesa destino no encontrada'], 404);
+            }
+            if ($mesaDest['activa'] !== true && $mesaDest['activa'] !== 't') {
+                $db->rollBack();
+                jsonResponse(['error' => true, 'message' => 'La mesa destino esta inactiva'], 400);
+            }
+
+            // Resolver comanda destino: usar la abierta o crear una nueva.
+            $cDestSt = $db->prepare("SELECT id FROM comandas WHERE mesa_id = :m AND estado = 'abierta' FOR UPDATE");
+            $cDestSt->execute([':m' => $mesaDestinoId]);
+            $cDestRow = $cDestSt->fetch();
+            if ($cDestRow) {
+                $comandaDestId = (int)$cDestRow['id'];
+            } else {
+                $insC = $db->prepare("INSERT INTO comandas (mesa_id, usuario_apertura_id) VALUES (:m, :u) RETURNING id");
+                $insC->execute([':m' => $mesaDestinoId, ':u' => sesionId()]);
+                $comandaDestId = (int)$insC->fetch()['id'];
+            }
+
+            // Consolidar con linea existente en destino si matchean las 4 keys.
+            $matchSt = $db->prepare("
+                SELECT id FROM comanda_items
+                WHERE comanda_id = :c
+                  AND producto_id = :p
+                  AND precio_unitario = :pr
+                  AND unidad_medida IS NOT DISTINCT FROM :um
+                  AND notas IS NOT DISTINCT FROM :n
+                  AND id <> :self
+                LIMIT 1
+                FOR UPDATE
+            ");
+            $matchSt->execute([
+                ':c'  => $comandaDestId,       ':p' => (int)$item['producto_id'],
+                ':pr' => $item['precio_unitario'],
+                ':um' => $item['unidad_medida'], ':n' => $item['notas'],
+                ':self' => $itemId,
+            ]);
+            $match = $matchSt->fetch();
+
+            if ($match) {
+                // Sumo cantidad al existente y borro el item original.
+                $db->prepare("
+                    UPDATE comanda_items
+                       SET cantidad = cantidad + :q,
+                           subtotal = precio_unitario * (cantidad + :q)
+                     WHERE id = :id
+                ")->execute([':q' => $item['cantidad'], ':id' => (int)$match['id']]);
+                $db->prepare("DELETE FROM comanda_items WHERE id = :id")->execute([':id' => $itemId]);
+            } else {
+                // Reasigno el item a la comanda destino, preservando hora_pedido.
+                $db->prepare("UPDATE comanda_items SET comanda_id = :c WHERE id = :id")
+                    ->execute([':c' => $comandaDestId, ':id' => $itemId]);
+            }
+
+            // Recalcular totales de ambas comandas.
+            $recalc = $db->prepare("UPDATE comandas SET total = COALESCE((SELECT SUM(subtotal) FROM comanda_items WHERE comanda_id = :c), 0) WHERE id = :c");
+            $recalc->execute([':c' => $comandaOrigenId]);
+            $recalc->execute([':c' => $comandaDestId]);
+
+            // Si origen quedo vacia, cerrarla para liberar la mesa.
+            $cntSt = $db->prepare("SELECT COUNT(*) FROM comanda_items WHERE comanda_id = :c");
+            $cntSt->execute([':c' => $comandaOrigenId]);
+            $origenVacia = ((int)$cntSt->fetchColumn()) === 0;
+            if ($origenVacia) {
+                $db->prepare("
+                    UPDATE comandas SET estado='anulada', hora_cierre=NOW(),
+                        motivo_anulacion = :mot
+                    WHERE id = :c
+                ")->execute([
+                    ':mot' => "Comanda vaciada por traslado de items a {$L_MESA_S} #{$mesaDest['numero']}",
+                    ':c'   => $comandaOrigenId,
+                ]);
+            }
+
+            $db->commit();
+            registrarAuditoria('Traslado de item', 'ventas', "Item #{$itemId} movido a {$L_MESA_S} #{$mesaDest['numero']} (comanda origen " . ($origenVacia ? 'cerrada' : 'activa') . ')');
+            jsonResponse([
+                'error'               => false,
+                'message'             => "Movido a {$L_MESA_S} #{$mesaDest['numero']}",
+                'comanda_cerrada'     => $origenVacia,
+                'mesa_destino_numero' => $mesaDest['numero'],
+                'comanda_destino_id'  => $comandaDestId,
+            ]);
+        } catch (Exception $e) {
+            if ($db->inTransaction()) $db->rollBack();
+            jsonResponse(['error' => true, 'message' => 'Error al mover item: ' . $e->getMessage()], 500);
+        }
+
+    case 'comanda_unir_mesa':
+        // Fusiona la comanda de la mesa fuente en la comanda destino.
+        // Todos los items de la fuente pasan a la destino (consolidando donde
+        // matchean las 4 keys). La comanda fuente se cierra como anulada y
+        // esa mesa vuelve a aparecer libre.
+        $d          = json_decode(file_get_contents('php://input'), true);
+        $destinoId  = intval($d['comanda_destino_id'] ?? 0);
+        $mesaFuente = intval($d['mesa_fuente_id']     ?? 0);
+        if (!$destinoId || !$mesaFuente) {
+            jsonResponse(['error' => true, 'message' => 'Datos incompletos'], 400);
+        }
+
+        try {
+            $db->beginTransaction();
+
+            $destSt = $db->prepare("
+                SELECT c.id, c.mesa_id, m.numero
+                FROM comandas c JOIN mesas m ON m.id = c.mesa_id
+                WHERE c.id = :id AND c.estado = 'abierta'
+                FOR UPDATE
+            ");
+            $destSt->execute([':id' => $destinoId]);
+            $dest = $destSt->fetch();
+            if (!$dest) {
+                $db->rollBack();
+                jsonResponse(['error' => true, 'message' => 'Comanda destino no esta abierta'], 400);
+            }
+            if ((int)$dest['mesa_id'] === $mesaFuente) {
+                $db->rollBack();
+                jsonResponse(['error' => true, 'message' => "La {$L_MESA_S} fuente es la misma que la destino"], 400);
+            }
+
+            $frSt = $db->prepare("
+                SELECT c.id, c.mesa_id, m.numero
+                FROM comandas c JOIN mesas m ON m.id = c.mesa_id
+                WHERE c.mesa_id = :m AND c.estado = 'abierta'
+                FOR UPDATE
+            ");
+            $frSt->execute([':m' => $mesaFuente]);
+            $fr = $frSt->fetch();
+            if (!$fr) {
+                $db->rollBack();
+                jsonResponse(['error' => true, 'message' => "La {$L_MESA_S} fuente no tiene comanda abierta"], 400);
+            }
+            $fuenteCId = (int)$fr['id'];
+
+            $itemsSt = $db->prepare("
+                SELECT id, producto_id, cantidad, precio_unitario, unidad_medida, notas
+                FROM comanda_items WHERE comanda_id = :c FOR UPDATE
+            ");
+            $itemsSt->execute([':c' => $fuenteCId]);
+            $items = $itemsSt->fetchAll();
+
+            $matchSt = $db->prepare("
+                SELECT id FROM comanda_items
+                WHERE comanda_id = :c
+                  AND producto_id = :p
+                  AND precio_unitario = :pr
+                  AND unidad_medida IS NOT DISTINCT FROM :um
+                  AND notas IS NOT DISTINCT FROM :n
+                LIMIT 1
+                FOR UPDATE
+            ");
+            $sumUpd = $db->prepare("
+                UPDATE comanda_items
+                   SET cantidad = cantidad + :q,
+                       subtotal = precio_unitario * (cantidad + :q)
+                 WHERE id = :id
+            ");
+            $delSt  = $db->prepare("DELETE FROM comanda_items WHERE id = :id");
+            $moveSt = $db->prepare("UPDATE comanda_items SET comanda_id = :c WHERE id = :id");
+
+            foreach ($items as $it) {
+                $matchSt->execute([
+                    ':c'  => $destinoId, ':p' => (int)$it['producto_id'],
+                    ':pr' => $it['precio_unitario'],
+                    ':um' => $it['unidad_medida'], ':n' => $it['notas'],
+                ]);
+                $match = $matchSt->fetch();
+                if ($match) {
+                    $sumUpd->execute([':q' => $it['cantidad'], ':id' => (int)$match['id']]);
+                    $delSt->execute([':id' => (int)$it['id']]);
+                } else {
+                    $moveSt->execute([':c' => $destinoId, ':id' => (int)$it['id']]);
+                }
+            }
+
+            $db->prepare("
+                UPDATE comandas SET estado='anulada', hora_cierre=NOW(),
+                    motivo_anulacion = :mot
+                WHERE id = :c
+            ")->execute([
+                ':mot' => "Comanda fusionada a {$L_MESA_S} #{$dest['numero']}",
+                ':c'   => $fuenteCId,
+            ]);
+
+            $db->prepare("UPDATE comandas SET total = COALESCE((SELECT SUM(subtotal) FROM comanda_items WHERE comanda_id = :c), 0) WHERE id = :c")
+                ->execute([':c' => $destinoId]);
+
+            $db->commit();
+            registrarAuditoria('Union de mesas', 'ventas', "{$L_MESA_S} #{$fr['numero']} fusionada a {$L_MESA_S} #{$dest['numero']} (" . count($items) . ' items)');
+            jsonResponse([
+                'error'              => false,
+                'message'            => "{$L_MESA_S} #{$fr['numero']} fusionada a esta {$L_MESA_S}",
+                'items_movidos'      => count($items),
+                'mesa_fuente_numero' => $fr['numero'],
+            ]);
+        } catch (Exception $e) {
+            if ($db->inTransaction()) $db->rollBack();
+            jsonResponse(['error' => true, 'message' => 'Error al unir mesas: ' . $e->getMessage()], 500);
+        }
+
     case 'cobrar_comanda':
         // Cierra la comanda emitiendo venta + comprobante.
         //   - tipo='ticket'  -> venta local sin SUNAT (Fase E MVP)

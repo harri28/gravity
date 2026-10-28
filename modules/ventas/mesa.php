@@ -98,6 +98,9 @@ include '../../includes/header.php';
                 · <span id="mesa-mozo-txt"></span>
             </div>
         </div>
+        <button id="btn-unir-mesa" class="btn btn-outline btn-sm" style="margin-left:auto" onclick="unirConMesa()" title="Fusionar otra <?= htmlspecialchars(mb_strtolower($L_mesa_s)) ?> en esta">
+            <i class="fas fa-code-merge"></i> Unir <?= htmlspecialchars(mb_strtolower($L_mesa_s)) ?>
+        </button>
     </div>
 </div>
 
@@ -199,6 +202,25 @@ include '../../includes/header.php';
                 ¿Cómo lo vas a cargar a la comanda?
             </div>
             <div id="unidad-mesa-opciones"></div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Elegir mesa (reutilizado para mover item y unir mesa) -->
+<div class="modal-overlay" id="modal-pick-mesa">
+    <div class="modal" style="max-width:720px">
+        <div class="modal-header">
+            <h3 class="modal-title" id="pick-mesa-titulo">
+                <i class="fas fa-chair" style="color:var(--primary);margin-right:8px"></i>
+                Elegir mesa
+            </h3>
+            <button class="modal-close" onclick="closeModal('modal-pick-mesa')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div id="pick-mesa-subtitulo" style="font-size:.78rem;color:var(--text-muted);margin-bottom:12px"></div>
+            <div class="pick-mesa-grid" id="pick-mesa-grid">
+                <div class="pick-mesa-empty"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>
+            </div>
         </div>
     </div>
 </div>
@@ -395,6 +417,38 @@ include '../../includes/header.php';
     font-size: .75rem;
 }
 .cliente-pill button:hover { background: rgba(0,0,0,.08); }
+
+/* === Modal "Elegir mesa" (reutilizado para mover item y unir mesa) === */
+.pick-mesa-grid {
+    display: grid; gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    max-height: 55vh; overflow-y: auto; padding: 2px;
+}
+.pick-mesa-card {
+    background: var(--surface); border: 2px solid var(--border);
+    border-radius: 10px; padding: 12px 10px; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    transition: all .12s;
+}
+.pick-mesa-card:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,.08); }
+.pick-mesa-card.libre    { border-color: #16a34a; background: rgba(22,163,74,.05); }
+.pick-mesa-card.libre:hover    { background: rgba(22,163,74,.12); }
+.pick-mesa-card.ocupada  { border-color: #0471cd; background: rgba(4,113,205,.06); }
+.pick-mesa-card.ocupada:hover  { background: rgba(4,113,205,.14); }
+.pick-mesa-numero { font-size: 1.4rem; font-weight: 800; color: var(--text); }
+.pick-mesa-nombre { font-size: .72rem; color: var(--text-muted); text-align: center; min-height: 1em; }
+.pick-mesa-estado { font-size: .68rem; font-weight: 600; padding: 1px 7px; border-radius: 10px; }
+.pick-mesa-card.libre   .pick-mesa-estado { background: #dcfce7; color: #15803d; }
+.pick-mesa-card.ocupada .pick-mesa-estado { background: #dbeafe; color: #0471cd; }
+.pick-mesa-empty { padding: 30px; text-align: center; color: var(--text-muted); font-size: .9rem; }
+
+/* Boton mover item (va al lado del tacho) */
+.item-move {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); padding: 4px 6px; border-radius: 4px;
+    font-size: .95rem; transition: all .1s;
+}
+.item-move:hover { color: var(--primary); background: var(--primary-light); }
 </style>
 
 <script>
@@ -565,6 +619,7 @@ function renderItem(it) {
                     <button onclick="cambiarCant(${it.id}, ${cant + 1})">+</button>
                 </div>
                 <div class="item-subtotal">${soles(it.subtotal)}</div>
+                <button class="item-move" title="Mover a otra ${(window.LABELS?.mesa?.s || 'mesa').toLowerCase()}" onclick="moverItemAMesa(${it.id})"><i class="fas fa-arrow-right-arrow-left"></i></button>
                 <button class="item-del" title="Quitar" onclick="quitarItem(${it.id})"><i class="fas fa-trash"></i></button>
             </div>
         </div>`;
@@ -749,6 +804,117 @@ async function cambiarCant(itemId, nuevaCant) {
     accionEnCurso = false;
     if (d.error) { showToast(d.message, 'error'); return; }
     await Promise.all([cargarComanda(), cargarProductos()]);
+}
+
+// --- Elegir mesa (modal reutilizable para mover item y unir mesa) ---
+// opts: { titulo, subtitulo, filtro: 'todas'|'ocupadas', excluirId, onPick(mesa) }
+async function openPickMesa(opts) {
+    document.getElementById('pick-mesa-titulo').innerHTML =
+        `<i class="fas fa-chair" style="color:var(--primary);margin-right:8px"></i> ${escH(opts.titulo || 'Elegir mesa')}`;
+    document.getElementById('pick-mesa-subtitulo').textContent = opts.subtitulo || '';
+    const grid = document.getElementById('pick-mesa-grid');
+    grid.innerHTML = '<div class="pick-mesa-empty"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>';
+    openModal('modal-pick-mesa');
+    let mesas = [];
+    try {
+        const r = await fetch(`${API}?action=mesas_estado`);
+        mesas = await r.json();
+        if (!Array.isArray(mesas)) mesas = [];
+    } catch (e) { mesas = []; }
+
+    const excluirId = parseInt(opts.excluirId || 0, 10);
+    const filtradas = mesas.filter(m => {
+        if (parseInt(m.id, 10) === excluirId) return false;
+        if (opts.filtro === 'ocupadas' && !m.comanda_id) return false;
+        return true;
+    });
+    if (!filtradas.length) {
+        const lbl = (window.LABELS?.mesa?.p || 'mesas').toLowerCase();
+        grid.innerHTML = `<div class="pick-mesa-empty">No hay ${lbl} disponibles.</div>`;
+        return;
+    }
+    grid.innerHTML = filtradas.map(m => {
+        const ocupada = !!m.comanda_id;
+        const cls   = ocupada ? 'ocupada' : 'libre';
+        const estado = ocupada ? 'Ocupada' : 'Libre';
+        const nombre = escH(m.nombre || '');
+        return `
+            <div class="pick-mesa-card ${cls}" onclick="_pickMesaChoose(${m.id})">
+                <div class="pick-mesa-numero">${escH(m.numero)}</div>
+                <div class="pick-mesa-nombre">${nombre || '&nbsp;'}</div>
+                <span class="pick-mesa-estado">${estado}</span>
+            </div>
+        `;
+    }).join('');
+    _pickMesaCache = filtradas;
+    _pickMesaCallback = opts.onPick || null;
+}
+
+let _pickMesaCache = [];
+let _pickMesaCallback = null;
+
+function _pickMesaChoose(mesaId) {
+    const mesa = _pickMesaCache.find(m => parseInt(m.id, 10) === parseInt(mesaId, 10));
+    closeModal('modal-pick-mesa');
+    if (mesa && typeof _pickMesaCallback === 'function') {
+        _pickMesaCallback(mesa);
+    }
+}
+
+async function moverItemAMesa(itemId) {
+    if (accionEnCurso) return;
+    const labelMesa = (window.LABELS?.mesa?.s || 'mesa').toLowerCase();
+    await openPickMesa({
+        titulo: `Mover item a otra ${labelMesa}`,
+        subtitulo: `El item completo pasa a la ${labelMesa} elegida. Si la ${labelMesa} esta libre, se abre una nueva comanda ahi.`,
+        filtro: 'todas',
+        excluirId: MESA_ID,
+        onPick: async (mesa) => {
+            accionEnCurso = true;
+            const d = await postJson(`${API}?action=comanda_mover_item`, {
+                item_id: itemId, mesa_destino_id: mesa.id,
+            });
+            accionEnCurso = false;
+            if (d.error) { showToast(d.message, 'error'); return; }
+            showToast(d.message, 'success');
+            if (d.comanda_cerrada) {
+                setTimeout(() => { window.location = 'index.php'; }, 600);
+                return;
+            }
+            await Promise.all([cargarComanda(), cargarProductos()]);
+        },
+    });
+}
+
+// --- Unir mesa: esta mesa absorbe otra que ya tiene comanda abierta ---
+async function unirConMesa() {
+    if (accionEnCurso) return;
+    const labelMesa = (window.LABELS?.mesa?.s || 'mesa').toLowerCase();
+    if (!COMANDA_ID) {
+        showToast(`Primero agrega un item a esta ${labelMesa} para poder unir otra.`, 'error');
+        return;
+    }
+    await openPickMesa({
+        titulo: `Unir otra ${labelMesa} en esta`,
+        subtitulo: `Los items de la ${labelMesa} elegida pasan a esta comanda y aquella queda libre.`,
+        filtro: 'ocupadas',
+        excluirId: MESA_ID,
+        onPick: async (mesa) => {
+            const ok = await appConfirm(
+                `Vas a fusionar la ${labelMesa} #${mesa.numero} en esta. Los items de la ${labelMesa} #${mesa.numero} pasaran aqui y esa ${labelMesa} quedara libre. ¿Confirmas?`,
+                { titulo: 'Confirmar union', textoOk: 'Si, unir', textoNo: 'Cancelar', tipo: 'warning' }
+            );
+            if (!ok) return;
+            accionEnCurso = true;
+            const d = await postJson(`${API}?action=comanda_unir_mesa`, {
+                comanda_destino_id: COMANDA_ID, mesa_fuente_id: mesa.id,
+            });
+            accionEnCurso = false;
+            if (d.error) { showToast(d.message, 'error'); return; }
+            showToast(d.message, 'success');
+            await Promise.all([cargarComanda(), cargarProductos()]);
+        },
+    });
 }
 
 // ---------------------------------------------------------------
