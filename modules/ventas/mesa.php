@@ -799,6 +799,12 @@ function cobrar() {
 
     TIPO_COMP_SELECT = 'boleta';
     CLIENTE_SELECT   = null;
+
+    // Reset del split al abrir -- cada comanda arranca con cobro simple.
+    splitPaymentEnabled = false;
+    splitPaymentRows    = [];
+    renderSplitPaymentPanel();
+
     cargarSeriesCobro();
     onComprobanteChange();
     onTipoPagoChange();
@@ -867,12 +873,164 @@ function toggleSwitch(checkboxId, trackId, ev) {
     track.firstElementChild.style.transform = chk.checked ? 'translateX(17px)' : 'translateX(0)';
 }
 
-// Stubs de las features del partial que aun no estan implementadas en mesa.
-// Ver docs/implementaciones_futuras.md para el plan.
-function toggleDividirCuenta() {
-    appAlert('Dividir cuenta estara disponible pronto en mesas.', { tipo: 'info', titulo: 'Pronto disponible' });
+// ===== Dividir cuenta (split payment) =====
+// Portado de pos.php. Permite repartir el cobro de UNA comanda entre varios
+// metodos (efectivo + yape + tarjeta...). Sigue siendo UNA venta/comprobante
+// -- el partido en N comprobantes distintos es feature aparte, ver item #3
+// de docs/implementaciones_futuras.md.
+let splitPaymentEnabled = false;
+let splitPaymentRows    = [];
+
+function round2(value)           { return Math.round((Number(value) || 0) * 100) / 100; }
+function formatMoneyValue(value) { return `S/ ${Number(value || 0).toFixed(2)}`; }
+
+function getCheckoutTotalAmount() {
+    return round2(ITEMS.reduce((s, it) => s + parseFloat(it.subtotal || 0), 0));
 }
-function addSplitPaymentRow()      { toggleDividirCuenta(); }
+
+function getPaymentMethodOptions(selected = 'efectivo') {
+    const methods = [
+        ['efectivo', 'Efectivo'], ['yape', 'Yape'], ['plin', 'Plin'],
+        ['tarjeta', 'Visa/Mastercard'], ['transferencia', 'Transferencia'],
+    ];
+    return methods.map(([v, l]) => `<option value="${v}" ${String(selected) === v ? 'selected' : ''}>${l}</option>`).join('');
+}
+
+function getSplitPaymentRowsFromState() {
+    return splitPaymentRows
+        .map(r => ({
+            method: String(r.method || 'efectivo').trim() || 'efectivo',
+            amount: Math.max(0, round2(r.amount)),
+        }))
+        .filter(r => r.amount > 0);
+}
+
+function getSplitPaymentPayload(total) {
+    const rows      = getSplitPaymentRowsFromState();
+    const sum       = round2(rows.reduce((acc, r) => acc + r.amount, 0));
+    const remainder = round2(total - sum);
+    const cashTotal = round2(rows.filter(r => r.method === 'efectivo').reduce((acc, r) => acc + r.amount, 0));
+    return { rows, sum, remainder, cashTotal };
+}
+
+function toggleDividirCuenta() {
+    splitPaymentEnabled = !splitPaymentEnabled;
+    if (splitPaymentEnabled) {
+        const metodo = document.getElementById('tipo-pago')?.value || 'efectivo';
+        splitPaymentRows = [{ method: metodo, amount: getCheckoutTotalAmount() }];
+    } else {
+        splitPaymentRows = [];
+        const tp = document.getElementById('tipo-pago');
+        if (tp) tp.value = 'efectivo';
+    }
+    renderSplitPaymentPanel();
+    calcularVuelto();
+}
+
+function addSplitPaymentRow() {
+    splitPaymentEnabled = true;
+    splitPaymentRows.push({ method: 'efectivo', amount: 0 });
+    renderSplitPaymentPanel();
+    calcularVuelto();
+}
+
+function removeSplitPaymentRow(index) {
+    splitPaymentRows.splice(index, 1);
+    if (!splitPaymentRows.length) splitPaymentEnabled = false;
+    renderSplitPaymentPanel();
+    calcularVuelto();
+}
+
+function updateSplitPaymentRow(index, field, value) {
+    if (!splitPaymentRows[index]) return;
+    if (field === 'method') {
+        splitPaymentRows[index].method = value;
+        if (index === 0) {
+            const m = document.getElementById('tipo-pago');
+            if (m) m.value = value;
+        }
+    } else if (field === 'amount') {
+        splitPaymentRows[index].amount = round2(value);
+    }
+    updateSplitPaymentSummary();
+    calcularVuelto();
+}
+
+function updateSplitPaymentSummary() {
+    const total        = getCheckoutTotalAmount();
+    const breakdown    = getSplitPaymentRowsFromState();
+    const totalMethods = breakdown.reduce((s, r) => s + r.amount, 0);
+    const remaining    = round2(total - totalMethods);
+
+    const totalEl = document.getElementById('split-total-methods');
+    const remEl   = document.getElementById('split-remaining');
+    if (totalEl) totalEl.textContent = formatMoneyValue(totalMethods);
+    if (remEl) {
+        remEl.textContent = formatMoneyValue(Math.max(0, remaining));
+        remEl.parentElement?.classList.toggle('danger',  remaining  >  0.01);
+        remEl.parentElement?.classList.toggle('success', Math.abs(remaining) <= 0.01);
+    }
+
+    const input = document.getElementById('monto-cliente');
+    if (splitPaymentEnabled && breakdown.length === 1 && breakdown[0].method === 'efectivo' && input) {
+        input.value = breakdown[0].amount.toFixed(2);
+    }
+}
+
+function renderSplitPaymentPanel() {
+    const panel         = document.getElementById('split-payment-panel');
+    const rowsEl        = document.getElementById('split-payment-rows');
+    const toggleBtn     = document.getElementById('btn-dividir-cuenta');
+    const simpleSection = document.getElementById('pago-simple-section');
+    if (!panel || !rowsEl) return;
+
+    panel.style.display = splitPaymentEnabled ? 'block' : 'none';
+    if (simpleSection) simpleSection.style.display = splitPaymentEnabled ? 'none' : 'block';
+    if (toggleBtn) {
+        toggleBtn.innerHTML = splitPaymentEnabled
+            ? '<i class="fas fa-minus"></i> Volver al cobro simple'
+            : '<i class="fas fa-plus"></i> Dividir cuenta';
+    }
+    if (!splitPaymentEnabled) {
+        rowsEl.innerHTML = '';
+        updateSplitPaymentSummary();
+        return;
+    }
+    if (!splitPaymentRows.length) {
+        splitPaymentRows = [{
+            method: document.getElementById('tipo-pago')?.value || 'efectivo',
+            amount: getCheckoutTotalAmount(),
+        }];
+    }
+    rowsEl.innerHTML = splitPaymentRows.map((row, index) => {
+        const canDelete = splitPaymentRows.length > 1;
+        return `
+            <div class="split-pay-row">
+                <div>
+                    <label class="form-label" style="font-size:.71rem">Método ${index + 1}</label>
+                    <select class="form-control" style="font-size:.82rem" onchange="updateSplitPaymentRow(${index}, 'method', this.value)">
+                        ${getPaymentMethodOptions(row.method)}
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" style="font-size:.71rem">Monto</label>
+                    <input type="number" class="form-control" step="0.01" min="0"
+                        value="${Number(row.amount || 0).toFixed(2)}"
+                        oninput="updateSplitPaymentRow(${index}, 'amount', this.value)">
+                </div>
+                <div>
+                    <button type="button" class="btn btn-outline btn-sm" style="width:32px;height:32px;padding:0"
+                        title="Eliminar método" ${canDelete ? `onclick="removeSplitPaymentRow(${index})"` : 'disabled'}>
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+    updateSplitPaymentSummary();
+}
+
+// Stubs de otras features del partial pendientes (ver docs/implementaciones_futuras.md).
 function addCreditInstallmentRow() {
     appAlert('Venta a credito desde mesa estara disponible pronto.', { tipo: 'info', titulo: 'Pronto disponible' });
 }
@@ -973,7 +1131,18 @@ async function confirmarVenta() {
         }
     }
 
-    if (metodo === 'efectivo' && recibido < total) {
+    // Si split esta activo: ignorar el input "efectivo recibido" y usar el
+    // breakdown. El tipo_pago/monto_recibido que mandamos a cobrar_comanda
+    // son los del primer metodo (fallback) -- el real queda en payment_breakdown.
+    const splitData = splitPaymentEnabled ? getSplitPaymentPayload(round2(total)) : null;
+    if (splitPaymentEnabled) {
+        if (!splitData.rows.length) {
+            showToast('Agrega al menos un método de pago', 'error'); return;
+        }
+        if (Math.abs(splitData.remainder) > 0.01) {
+            showToast('La suma de los métodos de pago debe coincidir con el total de la venta', 'error'); return;
+        }
+    } else if (metodo === 'efectivo' && recibido < total) {
         const ok = await appConfirm(
             `El monto recibido (${soles(recibido)}) es menor al total (${soles(total)}). ¿Confirmar igual?`,
             { titulo: 'Monto insuficiente', textoOk: 'Confirmar', textoNo: 'Cancelar', tipo: 'warning' }
@@ -985,6 +1154,11 @@ async function confirmarVenta() {
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cobrando...';
 
+    const payloadTipoPago     = splitPaymentEnabled ? splitData.rows[0].method : metodo;
+    const payloadMontoRecibido = splitPaymentEnabled
+        ? splitData.cashTotal
+        : (metodo === 'efectivo' ? recibido : total);
+
     let d;
     try {
         d = await postJson(`${API}?action=cobrar_comanda`, {
@@ -992,9 +1166,10 @@ async function confirmarVenta() {
             tipo_comprobante: tipoComp,
             tipo_impresion: tipoImpr,
             serie: serie || null,
-            tipo_pago: metodo,
+            tipo_pago: payloadTipoPago,
             cuenta_banco: cuentaBanco,
-            monto_recibido: metodo === 'efectivo' ? recibido : total,
+            monto_recibido: payloadMontoRecibido,
+            payment_breakdown: splitPaymentEnabled ? splitData.rows : [],
             observaciones: obs,
             imprimir_observacion: imprimirObs,
             cliente_id: (CLIENTE_SELECT && CLIENTE_SELECT.id) ? CLIENTE_SELECT.id : null,

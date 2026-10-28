@@ -264,7 +264,8 @@ function ventasCobrarComandaConSunat(
     ?int $clienteId,
     float $montoRecibido,
     string $observaciones,
-    int $cajaId
+    int $cajaId,
+    array $paymentBreakdown = []
 ): array {
     // --- Lock de comanda + items + info de mesa ---
     $cSt = $db->prepare("
@@ -437,7 +438,10 @@ function ventasCobrarComandaConSunat(
         ':icb' => $resumen['icbper'],
         ':vu'  => $vuelto,
         ':cuo' => json_encode([], JSON_UNESCAPED_UNICODE),
-        ':pb'  => json_encode([[
+        // Si el cobro trae split (varios metodos), lo guardamos tal cual. Si no,
+        // dejamos el breakdown implicito de "un solo metodo = total" para no
+        // romper el reporte que lee payment_breakdown.
+        ':pb'  => json_encode(!empty($paymentBreakdown) ? $paymentBreakdown : [[
             'method'     => $tipoPago,
             'amount'     => $total,
             'account_id' => null,
@@ -892,6 +896,26 @@ switch ($action) {
         $observac    = trim($d['observaciones'] ?? '');
         $clienteId   = !empty($d['cliente_id']) ? (int) $d['cliente_id'] : null;
 
+        // Split payment: array opcional [{method, amount, account_id?}, ...].
+        // Si viene, reemplaza el "pago simple" y se guarda en ventas.payment_breakdown.
+        // Mismo formato que acepta registrar_venta (ver api.php:~1414).
+        $paymentBreakdown = [];
+        if (!empty($d['payment_breakdown']) && is_array($d['payment_breakdown'])) {
+            foreach ($d['payment_breakdown'] as $payment) {
+                $method = strtolower(trim((string) ($payment['method'] ?? '')));
+                $amount = round((float) ($payment['amount'] ?? 0), 2);
+                $accountId = isset($payment['account_id']) && $payment['account_id'] !== ''
+                    ? (int) $payment['account_id']
+                    : null;
+                if ($method === '' || $amount <= 0) continue;
+                $paymentBreakdown[] = [
+                    'method'     => $method,
+                    'amount'     => $amount,
+                    'account_id' => $accountId,
+                ];
+            }
+        }
+
         if (!$comandaId) {
             jsonResponse(['error' => true, 'message' => 'Comanda no especificada'], 400);
         }
@@ -938,7 +962,8 @@ switch ($action) {
                 $db->beginTransaction();
                 $result = ventasCobrarComandaConSunat(
                     $db, $comandaId, $tipoComp, $tipoPago,
-                    $clienteId, $montoRec, $observac, $cajaId
+                    $clienteId, $montoRec, $observac, $cajaId,
+                    $paymentBreakdown
                 );
                 $db->commit();
             } catch (Exception $e) {
@@ -1064,19 +1089,26 @@ switch ($action) {
             // tipo_comprobante=ticket, estado=completada. ventas.monto_recibido
             // no existe en el schema (ver registrar_venta en linea 1183+); el
             // "recibido" se infiere como total + vuelto cuando hace falta.
+            // payment_breakdown: si el cobro trae split (varios metodos), lo
+            // guardamos tal cual; si no, fallback a un solo metodo = total.
+            $pbTicket = !empty($paymentBreakdown) ? $paymentBreakdown : [[
+                'method'     => $tipoPago,
+                'amount'     => $total,
+                'account_id' => null,
+            ]];
             $vIns = $db->prepare("
                 INSERT INTO ventas (
                     numero_venta, caja_id, usuario_id,
                     subtotal, igv, total,
                     tipo_pago, tipo_comprobante,
-                    vuelto,
+                    vuelto, payment_breakdown,
                     observaciones, vendedor, comanda_id,
                     estado
                 ) VALUES (
                     :nv, :ci, :ui,
                     :sub, 0, :tot,
                     :tp, :tc,
-                    :vu,
+                    :vu, :pb,
                     :ob, :vn, :cm,
                     'completada'
                 ) RETURNING id, numero_venta
@@ -1086,6 +1118,7 @@ switch ($action) {
                 ':sub' => $total, ':tot' => $total,
                 ':tp' => $tipoPago, ':tc' => $tipoComp,
                 ':vu' => $vuelto,
+                ':pb' => json_encode($pbTicket, JSON_UNESCAPED_UNICODE),
                 ':ob' => $observac !== '' ? $observac : "{$L_MESA_S} #{$comanda['mesa_num']}",
                 ':vn' => sesionNombre(), ':cm' => $comandaId,
             ]);
