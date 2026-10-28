@@ -41,10 +41,14 @@
             <div style="display:grid;grid-template-columns:2fr 1.2fr 1fr;gap:10px;margin-bottom:12px">
                 <div>
                     <label class="form-label" style="font-size:.71rem">Tipo de documento</label>
+                    <!-- La opción "Ticket" (nota de venta local, no se envía a SUNAT) se
+                         quitó a propósito: toda venta debe llegar a SUNAT. Sin cliente, la
+                         boleta se emite a "Clientes Varios" (doc 0, 00000000), válida para
+                         totales < S/700. El backend aún acepta tipo 'ticket' por compatibilidad,
+                         pero la UI ya no lo ofrece. -->
                     <select class="form-control" id="tipo-comprobante" style="font-size:.82rem" onchange="onComprobanteChange()">
                         <option value="boleta">Boleta Electrónica</option>
                         <option value="factura">Factura Electrónica</option>
-                        <option value="ticket">Ticket</option>
                     </select>
                 </div>
                 <div>

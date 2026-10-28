@@ -67,7 +67,7 @@ function ventasPrecioUnitarioFinal(array $producto): float
     return $precio;
 }
 
-// Promociones (Reportes, Bloque 2, migration_56). Devuelve el precio base
+// Promociones (Inventario → tab Promociones, migration_56). Devuelve el precio base
 // (sin IGV, misma escala que productos.precio_venta) mas barato entre todas
 // las promociones vigentes para este producto, o null si no hay ninguna.
 // Solo se llama cuando se vende a la unidad base del producto (ver el punto
@@ -365,6 +365,16 @@ function ventasCobrarComandaConSunat(
         if ($clienteInfo) {
             $clienteId = (int) $clienteInfo['id'];
         }
+    }
+
+    // Tope SUNAT: boleta a comprador NO identificado (Clientes Varios / sin DNI
+    // valido) solo es valida con total < S/700. A partir de ese monto SUNAT exige
+    // el DNI. El registro generico tiene dni = '00000000' (invalido), se excluye.
+    $rucCli = trim((string) ($clienteInfo['ruc'] ?? ''));
+    $dniCli = trim((string) ($clienteInfo['dni'] ?? ''));
+    $clienteIdentificado = $rucCli !== '' || (preg_match('/^\d{8}$/', $dniCli) && $dniCli !== '00000000');
+    if ($tipoComp === 'boleta' && !$clienteIdentificado && (float) $total >= SUNAT_BOLETA_TOPE_SIN_DNI) {
+        throw new Exception('Para boletas de S/ ' . SUNAT_BOLETA_TOPE_SIN_DNI . ' o más, SUNAT exige registrar el DNI del cliente. Selecciona un cliente con DNI o emite factura.');
     }
 
     // --- Reservar serie + correlativo (atomico via UPDATE RETURNING) ---
@@ -1295,7 +1305,7 @@ switch ($action) {
                     SELECT 1 FROM toma_inventario_sesiones s
                     WHERE s.estado = 'activa' AND p.categoria_id = ANY(s.categorias_ids)
                 ) AS en_conteo_inventario,
-                -- Promociones (Reportes, Bloque 2, migration_56): precio base (sin IGV
+                -- Promociones (Inventario → tab Promociones, migration_56): precio base (sin IGV
                 -- aplicado todavia, misma semantica que p.precio_venta) resultante de la
                 -- promocion mas barata vigente para este producto, o NULL si no hay
                 -- ninguna. El front recalcula el IGV con getProductUnitSalePrice() igual
@@ -1651,6 +1661,38 @@ switch ($action) {
 
             if ($tipoComp === 'factura' && (!$clienteInfo || empty($clienteInfo['ruc']))) {
                 throw new Exception('Para emitir factura debe seleccionar un cliente con RUC registrado');
+            }
+
+            // Boleta sin cliente: usar "Clientes Varios" (SUNAT permite boleta sin
+            // DNI para totales < S/700). Mismo criterio que la ruta de Mesas
+            // (ventasCobrarComandaConSunat). Sin esto, enviar_sunat() lanzaria
+            // "Para emitir boleta electronica debe seleccionar un cliente".
+            if ($tipoComp === 'boleta' && !$clienteInfo) {
+                $cvStmt = $db->query("
+                    SELECT id, nombres, apellidos, dni, ruc, telefono, email, direccion,
+                           tipo_documento_id, tipo_documento_codigo, numero_documento,
+                           nombre_completo, razon_social, ubigeo
+                    FROM clientes
+                    WHERE COALESCE(numero_documento,'') = '00000000'
+                       OR nombres ILIKE '%CLIENTES VARIOS%'
+                       OR nombre_completo ILIKE '%CLIENTES VARIOS%'
+                    LIMIT 1
+                ");
+                $clienteInfo = $cvStmt->fetch() ?: null;
+                if ($clienteInfo) {
+                    $data['cliente_id'] = (int) $clienteInfo['id'];
+                }
+            }
+
+            // Tope SUNAT: una boleta a comprador NO identificado (Clientes Varios /
+            // sin DNI valido) solo es valida con total < S/700. A partir de ese
+            // monto SUNAT exige el DNI. OJO: el registro generico tiene dni = '00000000'
+            // (8 digitos pero invalido), por eso se excluye explicitamente.
+            $rucCli = trim((string) ($clienteInfo['ruc'] ?? ''));
+            $dniCli = trim((string) ($clienteInfo['dni'] ?? ''));
+            $clienteIdentificado = $rucCli !== '' || (preg_match('/^\d{8}$/', $dniCli) && $dniCli !== '00000000');
+            if ($tipoComp === 'boleta' && !$clienteIdentificado && (float) $total >= SUNAT_BOLETA_TOPE_SIN_DNI) {
+                throw new Exception('Para boletas de S/ ' . SUNAT_BOLETA_TOPE_SIN_DNI . ' o más, SUNAT exige registrar el DNI del cliente. Selecciona un cliente con DNI o emite factura.');
             }
 
             if ($esCredito && (!$clienteInfo || ventasEsClienteVarios($clienteInfo))) {

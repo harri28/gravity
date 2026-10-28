@@ -2395,6 +2395,20 @@ function confirmarVenta() {
         }
     }
 
+    // Tope SUNAT: boleta a comprador no identificado exige DNI desde S/<tope>.
+    // (El backend lo valida igual; esto solo adelanta el aviso al cajero.)
+    if (tipoComp === 'boleta') {
+        const TOPE = <?= defined('SUNAT_BOLETA_TOPE_SIN_DNI') ? (int) SUNAT_BOLETA_TOPE_SIN_DNI : 700 ?>;
+        const ruc = String(selectedCliente?.ruc || '').trim();
+        const dni = String(selectedCliente?.dni || '').trim();
+        const identificado = ruc !== '' || (/^\d{8}$/.test(dni) && dni !== '00000000');
+        if (!identificado && total >= TOPE) {
+            showToast(`Para boletas de S/ ${TOPE} a más, registra el DNI del cliente (lo exige SUNAT) o emite factura.`, 'error');
+            focusClienteSelect();
+            return;
+        }
+    }
+
     if (creditPaymentEnabled) {
         const numeroDocumento = String(selectedCliente?.numero_documento || selectedCliente?.dni || selectedCliente?.ruc || '').trim();
         const nombreCliente = String(selectedCliente?.razon_social || selectedCliente?.nombre_completo || '').trim().toUpperCase();

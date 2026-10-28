@@ -1132,6 +1132,18 @@ async function confirmarVenta() {
         }
     }
 
+    // Tope SUNAT: boleta a comprador no identificado exige DNI desde S/<tope>.
+    // (El backend lo valida igual; esto solo adelanta el aviso.)
+    if (tipoComp === 'boleta') {
+        const TOPE = <?= defined('SUNAT_BOLETA_TOPE_SIN_DNI') ? (int) SUNAT_BOLETA_TOPE_SIN_DNI : 700 ?>;
+        const ruc = String(CLIENTE_SELECT?.ruc || '').trim();
+        const doc = String(CLIENTE_SELECT?.doc || CLIENTE_SELECT?.numero_documento || CLIENTE_SELECT?.dni || '').trim();
+        const identificado = ruc !== '' || (/^\d{8}$/.test(doc) && doc !== '00000000');
+        if (!identificado && total >= TOPE) {
+            showToast(`Para boletas de S/ ${TOPE} a más, registra el DNI del cliente (lo exige SUNAT) o emite factura.`, 'error'); return;
+        }
+    }
+
     // Si split esta activo: ignorar el input "efectivo recibido" y usar el
     // breakdown. El tipo_pago/monto_recibido que mandamos a cobrar_comanda
     // son los del primer metodo (fallback) -- el real queda en payment_breakdown.

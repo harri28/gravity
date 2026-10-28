@@ -20,6 +20,12 @@ define('DB_NAME', 'gravity');
 define('DB_USER', 'postgres');
 define('DB_PASS', '1234');
 
+// Tope SUNAT para boletas a comprador no identificado (Clientes Varios, doc 0):
+// si el total de la boleta es IGUAL O MAYOR a este monto, SUNAT exige el DNI del
+// comprador. Se valida en el backend (ventas/api.php, ambas rutas de cobro) y se
+// adelanta en el frontend (pos.php y mesa.php). Fuente unica para no desincronizar.
+define('SUNAT_BOLETA_TOPE_SIN_DNI', 700);
+
 function getDB(): PDO
 {
     static $pdo = null;
