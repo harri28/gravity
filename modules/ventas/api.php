@@ -778,22 +778,54 @@ switch ($action) {
                 jsonResponse(['error' => true, 'message' => "Sin stock de {$prod['nombre']} (disponible: " . rtrim(rtrim((string)$prod['stock'], '0'), '.') . ')'], 400);
             }
 
-            $subtotal = $precio * $cantidad;
+            $subtotal     = $precio * $cantidad;
+            $notasFinal   = $notas !== '' ? $notas : null;
 
-            $ins = $db->prepare("
-                INSERT INTO comanda_items (comanda_id, producto_id, cantidad, precio_unitario, subtotal, usuario_id, notas, unidad_medida, factor_unidad)
-                VALUES (:c, :p, :q, :pr, :s, :u, :n, :um, :f)
-                RETURNING id, hora_pedido
+            // Consolidar: si ya hay una linea con mismo producto/unidad/notas/precio,
+            // le sumo cantidad en vez de crear una fila nueva. IS NOT DISTINCT FROM
+            // trata NULL=NULL como TRUE (operador normal = da FALSE con NULLs).
+            $findSt = $db->prepare("
+                SELECT id, cantidad FROM comanda_items
+                WHERE comanda_id = :c
+                  AND producto_id = :p
+                  AND precio_unitario = :pr
+                  AND unidad_medida IS NOT DISTINCT FROM :um
+                  AND notas IS NOT DISTINCT FROM :n
+                LIMIT 1
+                FOR UPDATE
             ");
-            $ins->execute([
-                ':c' => $comandaId, ':p' => $productoId,
-                ':q' => $cantidad, ':pr' => $precio, ':s' => $subtotal,
-                ':u' => sesionId(),
-                ':n' => $notas !== '' ? $notas : null,
-                ':um' => $unidadMedida,
-                ':f' => $factor,
+            $findSt->execute([
+                ':c'  => $comandaId, ':p' => $productoId,
+                ':pr' => $precio,    ':um' => $unidadMedida, ':n' => $notasFinal,
             ]);
-            $itemRow = $ins->fetch();
+            $existing = $findSt->fetch();
+
+            if ($existing) {
+                $upd = $db->prepare("
+                    UPDATE comanda_items
+                       SET cantidad = cantidad + :q,
+                           subtotal = precio_unitario * (cantidad + :q)
+                     WHERE id = :id
+                 RETURNING id, hora_pedido
+                ");
+                $upd->execute([':q' => $cantidad, ':id' => $existing['id']]);
+                $itemRow = $upd->fetch();
+            } else {
+                $ins = $db->prepare("
+                    INSERT INTO comanda_items (comanda_id, producto_id, cantidad, precio_unitario, subtotal, usuario_id, notas, unidad_medida, factor_unidad)
+                    VALUES (:c, :p, :q, :pr, :s, :u, :n, :um, :f)
+                    RETURNING id, hora_pedido
+                ");
+                $ins->execute([
+                    ':c' => $comandaId, ':p' => $productoId,
+                    ':q' => $cantidad, ':pr' => $precio, ':s' => $subtotal,
+                    ':u' => sesionId(),
+                    ':n' => $notasFinal,
+                    ':um' => $unidadMedida,
+                    ':f' => $factor,
+                ]);
+                $itemRow = $ins->fetch();
+            }
 
             if (!$esService) {
                 $db->prepare("UPDATE productos SET stock = stock - :q WHERE id = :id")
