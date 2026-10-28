@@ -936,7 +936,11 @@ function addSplitPaymentRow() {
 
 function removeSplitPaymentRow(index) {
     splitPaymentRows.splice(index, 1);
-    if (!splitPaymentRows.length) splitPaymentEnabled = false;
+    if (!splitPaymentRows.length) {
+        splitPaymentEnabled = false;
+        const tp = document.getElementById('tipo-pago');
+        if (tp) tp.value = 'efectivo';
+    }
     renderSplitPaymentPanel();
     calcularVuelto();
 }
@@ -1002,9 +1006,7 @@ function renderSplitPaymentPanel() {
             amount: getCheckoutTotalAmount(),
         }];
     }
-    rowsEl.innerHTML = splitPaymentRows.map((row, index) => {
-        const canDelete = splitPaymentRows.length > 1;
-        return `
+    rowsEl.innerHTML = splitPaymentRows.map((row, index) => `
             <div class="split-pay-row">
                 <div>
                     <label class="form-label" style="font-size:.71rem">Método ${index + 1}</label>
@@ -1020,13 +1022,12 @@ function renderSplitPaymentPanel() {
                 </div>
                 <div>
                     <button type="button" class="btn btn-outline btn-sm" style="width:32px;height:32px;padding:0"
-                        title="Eliminar método" ${canDelete ? `onclick="removeSplitPaymentRow(${index})"` : 'disabled'}>
+                        title="Eliminar método" onclick="removeSplitPaymentRow(${index})">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
             </div>
-        `;
-    }).join('');
+        `).join('');
     updateSplitPaymentSummary();
 }
 
