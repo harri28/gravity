@@ -192,6 +192,16 @@ function generarSkuAutomatico(PDO $db, string $nombreProducto, ?int $excluirId =
     return $iniciales . str_pad((string) $siguiente, 3, '0', STR_PAD_LEFT);
 }
 
+// Estado visible de una promocion segun sus fechas y su flag 'activo'.
+function inventarioPromoEstado(string $fechaInicio, string $fechaFin, bool $activo): string
+{
+    if (!$activo) { return 'inactiva'; }
+    $hoy = date('Y-m-d');
+    if ($hoy < $fechaInicio) { return 'proxima'; }
+    if ($hoy > $fechaFin)    { return 'vencida'; }
+    return 'vigente';
+}
+
 try {
 
 switch ($action) {
@@ -1157,6 +1167,141 @@ switch ($action) {
             if ($db->inTransaction()) { $db->rollBack(); }
             jsonResponse(['error' => true, 'message' => $e->getMessage()], 422);
         }
+
+    // ----------------------------------------------------------------
+    // PROMOCIONES (descuentos temporales -- ver modules/ventas/api.php
+    // para donde se aplica el precio en el POS). Gestion solo admin/gerente.
+    // ----------------------------------------------------------------
+    case 'promociones_listar':
+        if (!isAdmin()) jsonResponse(['error' => true, 'message' => 'Solo administradores pueden gestionar promociones'], 403);
+        $rows = $db->query("
+            SELECT
+                pr.id, pr.nombre, pr.descripcion, pr.tipo_descuento, pr.valor_descuento,
+                pr.fecha_inicio, pr.fecha_fin, pr.activo, pr.created_at,
+                u.nombre AS creado_por_nombre,
+                (SELECT COUNT(*) FROM promocion_productos pp WHERE pp.promocion_id = pr.id) AS total_productos,
+                (
+                    SELECT STRING_AGG(p2.nombre, ', ')
+                    FROM promocion_productos pp2
+                    JOIN productos p2 ON p2.id = pp2.producto_id
+                    WHERE pp2.promocion_id = pr.id
+                ) AS productos_nombres,
+                -- Detalle producto por producto (nombre + codigo de barras), en el
+                -- mismo orden para los dos, asi el front puede mostrarlos en columnas
+                -- separadas sin que se desalineen cuando algun producto no tiene barras.
+                (
+                    SELECT json_agg(json_build_object('nombre', p3.nombre, 'codigo_barras', p3.codigo_barras) ORDER BY p3.nombre)
+                    FROM promocion_productos pp3
+                    JOIN productos p3 ON p3.id = pp3.producto_id
+                    WHERE pp3.promocion_id = pr.id
+                ) AS productos_detalle
+            FROM promociones pr
+            LEFT JOIN public.usuarios u ON u.id = pr.creado_por
+            ORDER BY pr.created_at DESC
+        ")->fetchAll();
+
+        foreach ($rows as &$row) {
+            $row['estado'] = inventarioPromoEstado($row['fecha_inicio'], $row['fecha_fin'], $row['activo'] === true || $row['activo'] === 't');
+            // json_agg() vuelve de Postgres como texto -- decodificarlo aca para no
+            // mandarlo doble-codificado (string con JSON adentro) al front.
+            $row['productos_detalle'] = $row['productos_detalle'] ? json_decode($row['productos_detalle'], true) : [];
+        }
+        unset($row);
+        echo json_encode($rows);
+        break;
+
+    case 'promocion_crear':
+        if (!isAdmin()) jsonResponse(['error' => true, 'message' => 'Solo administradores pueden crear promociones'], 403);
+        $data = json_decode(file_get_contents('php://input'), true);
+
+        $nombre = trim((string) ($data['nombre'] ?? ''));
+        $tipoDescuento = trim((string) ($data['tipo_descuento'] ?? ''));
+        $valorDescuento = floatval($data['valor_descuento'] ?? 0);
+        $fechaInicio = trim((string) ($data['fecha_inicio'] ?? ''));
+        $fechaFin = trim((string) ($data['fecha_fin'] ?? ''));
+        $productoIds = array_values(array_unique(array_filter(array_map('intval', $data['producto_ids'] ?? []))));
+
+        if ($nombre === '') {
+            jsonResponse(['error' => true, 'message' => 'El nombre de la promoción es requerido'], 400);
+        }
+        if (!in_array($tipoDescuento, ['porcentaje', 'monto_fijo'], true)) {
+            jsonResponse(['error' => true, 'message' => 'Tipo de descuento inválido'], 400);
+        }
+        if ($valorDescuento <= 0) {
+            jsonResponse(['error' => true, 'message' => 'El descuento debe ser mayor a 0'], 400);
+        }
+        if ($tipoDescuento === 'porcentaje' && $valorDescuento > 100) {
+            jsonResponse(['error' => true, 'message' => 'El descuento porcentual no puede superar 100%'], 400);
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaInicio) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaFin)) {
+            jsonResponse(['error' => true, 'message' => 'Fechas inválidas'], 400);
+        }
+        if ($fechaFin < $fechaInicio) {
+            jsonResponse(['error' => true, 'message' => 'La fecha de fin no puede ser anterior a la fecha de inicio'], 400);
+        }
+        if (empty($productoIds)) {
+            jsonResponse(['error' => true, 'message' => 'Selecciona al menos un producto'], 400);
+        }
+
+        // Filtra a solo productos que realmente existen en este schema -- nunca se
+        // confia en los ids que manda el navegador.
+        $placeholders = implode(',', array_fill(0, count($productoIds), '?'));
+        $checkProductos = $db->prepare("SELECT id FROM productos WHERE id IN ($placeholders)");
+        $checkProductos->execute($productoIds);
+        $productoIdsValidos = array_column($checkProductos->fetchAll(), 'id');
+        if (empty($productoIdsValidos)) {
+            jsonResponse(['error' => true, 'message' => 'Ninguno de los productos seleccionados es válido'], 400);
+        }
+
+        $db->beginTransaction();
+        try {
+            $stmt = $db->prepare("
+                INSERT INTO promociones (nombre, descripcion, tipo_descuento, valor_descuento, fecha_inicio, fecha_fin, creado_por)
+                VALUES (:nombre, :descripcion, :tipo, :valor, :finicio, :ffin, :uid)
+                RETURNING id
+            ");
+            $stmt->execute([
+                ':nombre' => $nombre,
+                ':descripcion' => trim((string) ($data['descripcion'] ?? '')) ?: null,
+                ':tipo' => $tipoDescuento,
+                ':valor' => $valorDescuento,
+                ':finicio' => $fechaInicio,
+                ':ffin' => $fechaFin,
+                ':uid' => sesionId(),
+            ]);
+            $promoId = $stmt->fetch()['id'];
+
+            $insertPp = $db->prepare("INSERT INTO promocion_productos (promocion_id, producto_id) VALUES (:pid, :prodid)");
+            foreach ($productoIdsValidos as $prodId) {
+                $insertPp->execute([':pid' => $promoId, ':prodid' => $prodId]);
+            }
+
+            $db->commit();
+        } catch (Exception $e) {
+            $db->rollBack();
+            jsonResponse(['error' => true, 'message' => 'No se pudo crear la promoción: ' . $e->getMessage()], 422);
+        }
+
+        registrarAuditoria('Creación de promoción', 'inventario', "Promoción: {$nombre} | {$tipoDescuento} {$valorDescuento} | {$fechaInicio} a {$fechaFin} | Productos: " . count($productoIdsValidos));
+        jsonResponse(['error' => false, 'message' => 'Promoción creada correctamente', 'id' => $promoId, 'productos_aplicados' => count($productoIdsValidos)]);
+
+    case 'promocion_toggle_activo':
+        if (!isAdmin()) jsonResponse(['error' => true, 'message' => 'Solo administradores pueden gestionar promociones'], 403);
+        $data = json_decode(file_get_contents('php://input'), true);
+        $id = intval($data['id'] ?? 0);
+        if (!$id) {
+            jsonResponse(['error' => true, 'message' => 'ID inválido'], 400);
+        }
+
+        $stmt = $db->prepare("UPDATE promociones SET activo = NOT activo, updated_at = NOW() WHERE id = :id RETURNING activo, nombre");
+        $stmt->execute([':id' => $id]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            jsonResponse(['error' => true, 'message' => 'Promoción no encontrada'], 404);
+        }
+
+        registrarAuditoria('Cambio de estado de promoción', 'inventario', "Promoción: {$row['nombre']} | Activa: " . ($row['activo'] ? 'si' : 'no'));
+        jsonResponse(['error' => false, 'activo' => $row['activo']]);
 
     default:
         jsonResponse(['error' => true, 'message' => 'Accion no valida'], 404);
