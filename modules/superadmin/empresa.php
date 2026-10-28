@@ -943,6 +943,7 @@ async function cargarUsuarios() {
     try {
         const r = await fetch(`${API}?action=usuarios_listar&tenant_id=${TENANT_ID}`);
         const lista = await r.json();
+        window._usuariosCache = lista;
         actualizarStats(null, lista.length);
 
         if (!lista.length) {
@@ -980,7 +981,7 @@ async function cargarUsuarios() {
                     <td style="text-align:right">
                         <div style="display:flex;gap:5px;justify-content:flex-end">
                             <button class="btn-icon btn-edit" title="Editar"
-                                onclick="prepEditUsuario(${u.id},'${esc(u.nombre)}','${esc(u.apellido||'')}','${esc(u.username)}','${esc(u.password_plain||'')}','${esc(u.observaciones||'')}',${primera?.sucursal_id||'null'},'${primera?.rol||'cajero'}')">
+                                onclick="prepEditUsuario(${u.id})">
                                 <i class="fas fa-pen"></i>
                             </button>
                             <button class="btn-icon btn-toggle ${u.activo?'':'off'}" title="${u.activo?'Desactivar':'Activar'}"
@@ -1036,13 +1037,19 @@ function cerrarFormUsuario() {
     document.getElementById('uPassEyeIcon').className = 'fas fa-eye';
 }
 
-function prepEditUsuario(id, nombre, apellido, username, passwordPlain, observaciones, sucursalId, rol) {
+function prepEditUsuario(id) {
+    const u = (window._usuariosCache || []).find(x => parseInt(x.id) === parseInt(id));
+    if (!u) { toast('No se encontró el usuario','err'); return; }
+    const acc = typeof u.accesos === 'string' ? JSON.parse(u.accesos) : (u.accesos || []);
+    const primera = acc[0] ?? null;
+    const sucursalId = primera?.sucursal_id ?? null;
+    const rol = primera?.rol ?? 'cajero';
     document.getElementById('uEditId').value         = id;
-    document.getElementById('uNombre').value         = nombre;
-    document.getElementById('uApellido').value       = apellido;
-    document.getElementById('uUsername').value       = username;
-    document.getElementById('uPassword').value       = passwordPlain || '';
-    document.getElementById('uObservaciones').value  = observaciones || '';
+    document.getElementById('uNombre').value         = u.nombre || '';
+    document.getElementById('uApellido').value       = u.apellido || '';
+    document.getElementById('uUsername').value       = u.username || '';
+    document.getElementById('uPassword').value       = u.password_plain || '';
+    document.getElementById('uObservaciones').value  = u.observaciones || '';
     document.getElementById('uRol').value            = rol || 'cajero';
     document.getElementById('formUsuarioTitulo').innerHTML = '<i class="fas fa-pen" style="color:#6366f1;margin-right:6px"></i>Editar usuario';
     document.getElementById('uPassLabel').textContent = 'Nueva contraseña';
