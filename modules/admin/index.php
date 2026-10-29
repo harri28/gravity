@@ -146,12 +146,13 @@ include '../../includes/header.php';
                         <th>Numero</th>
                         <th>Nombre</th>
                         <th>Capacidad</th>
+                        <th>Color</th>
                         <th>Estado</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody id="tbody-mesas">
-                    <tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></td></tr>
+                    <tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></td></tr>
                 </tbody>
             </table>
         </div>
@@ -1243,12 +1244,12 @@ function loadMesas() {
             const Ls = (window.LABELS?.mesa?.s || 'Mesa');
             if (data.error || !Array.isArray(data)) {
                 document.getElementById('tbody-mesas').innerHTML =
-                    `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-chair"></i><br><br>Error al cargar ${Lp}</td></tr>`;
+                    `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-chair"></i><br><br>Error al cargar ${Lp}</td></tr>`;
                 return;
             }
             if (!data.length) {
                 document.getElementById('tbody-mesas').innerHTML =
-                    `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-chair"></i><br><br>No hay ${Lp} registradas. Crea la primera con "Nueva ${Ls.toLowerCase()}".</td></tr>`;
+                    `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-chair"></i><br><br>No hay ${Lp} registradas. Crea la primera con "Nueva ${Ls.toLowerCase()}".</td></tr>`;
                 return;
             }
             document.getElementById('tbody-mesas').innerHTML = data.map(m => {
@@ -1258,6 +1259,7 @@ function loadMesas() {
                     <td><strong>${escH(m.numero)}</strong></td>
                     <td style="font-size:.88rem;color:var(--text-muted)">${escH(m.nombre || '—')}</td>
                     <td style="font-size:.88rem">${m.capacidad ? m.capacidad + ' pers.' : '—'}</td>
+                    <td>${m.color ? `<span style="display:inline-block;width:16px;height:16px;border-radius:4px;background:${m.color};box-shadow:0 0 0 1px #d1d5db;vertical-align:middle"></span>` : '<span style="color:var(--text-light)">—</span>'}</td>
                     <td>
                         <span class="badge ${activa ? 'badge-success' : 'badge-danger'}">${activa ? 'Activa' : 'Inactiva'}</span>
                         ${ocupada ? ' <span class="badge badge-warning" title="Comanda abierta ahora mismo">Ocupada</span>' : ''}
