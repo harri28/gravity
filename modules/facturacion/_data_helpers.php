@@ -48,6 +48,7 @@ function facturacionCargarComprobanteVenta(PDO $db, int $comprobanteId): array
             ce.documento_modificado_numero_completo,
             ce.documento_modificado_fecha,
             v.numero_venta,
+            v.estado,
             v.tipo_pago,
             v.sunat_forma_pago,
             v.fecha_emision,

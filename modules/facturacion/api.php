@@ -726,6 +726,9 @@ switch ($action) {
             require_once '../../config/sunat.php';
 
             $comp = facturacionCargarComprobanteVenta($db, $comprobanteId);
+            if (strtolower(trim((string) ($comp['estado'] ?? ''))) !== 'completada') {
+                jsonResponse(['error' => true, 'message' => 'El comprobante está anulado; no se puede reenviar.'], 422);
+            }
             $responseCode = facturacionExtraerResponseCode($comp['nubefact_response'] ?? null);
             $estadoSunat = strtolower(trim((string) ($comp['estado_sunat'] ?? '')));
             $yaEnviado = !empty($comp['enlace_del_cdr'])
