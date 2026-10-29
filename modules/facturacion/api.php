@@ -1408,6 +1408,45 @@ switch ($action) {
         }
         break;
 
+    // Emitir boleta/factura a SUNAT a partir de una nota de venta (ticket) ya
+    // registrada. La logica vive en facturacionEmitirComprobanteDesdeVenta()
+    // (modules/facturacion/_data_helpers.php), compartida con el script CLI
+    // scripts/emitir_notas_venta.php. OJO plazo SUNAT: se emite con la fecha
+    // original de la venta (ver el helper).
+    case 'emitir_desde_venta':
+        header('Content-Type: application/json; charset=UTF-8');
+
+        $data         = json_decode(file_get_contents('php://input'), true) ?: [];
+        $ventaId      = (int) ($data['venta_id'] ?? 0);
+        $tipo         = strtolower(trim((string) ($data['tipo'] ?? 'boleta')));
+        $clienteIdSel = !empty($data['cliente_id']) ? (int) $data['cliente_id'] : null;
+
+        if ($ventaId <= 0) {
+            jsonResponse(['error' => true, 'message' => 'Venta no válida.'], 422);
+        }
+        if (!in_array($tipo, ['boleta', 'factura'], true)) {
+            jsonResponse(['error' => true, 'message' => 'Tipo de comprobante inválido.'], 422);
+        }
+
+        try {
+            $r = facturacionEmitirComprobanteDesdeVenta($db, $ventaId, $tipo, $clienteIdSel);
+        } catch (RuntimeException $e) {
+            jsonResponse(['error' => true, 'message' => $e->getMessage()], 422);
+        }
+
+        registrarAuditoria('Emisión de comprobante desde nota de venta', 'facturacion',
+            "Venta #{$ventaId} -> {$r['numero_completo']} ({$r['tipo']})");
+
+        jsonResponse([
+            'error'           => false,
+            'message'         => $r['sunat_ok']
+                ? "Comprobante {$r['numero_completo']} emitido y aceptado por SUNAT."
+                : "Comprobante {$r['numero_completo']} generado. SUNAT: " . ($r['mensaje'] ?? $r['estado_sunat']) . ". Puedes reintentar con \"Reenviar a SUNAT\".",
+            'numero_completo' => $r['numero_completo'],
+            'sunat_estado'    => $r['estado_sunat'],
+            'sunat_ok'        => $r['sunat_ok'],
+        ]);
+
     default:
         header('Content-Type: application/json; charset=UTF-8');
         jsonResponse(['error' => true, 'message' => 'Acción no válida'], 404);

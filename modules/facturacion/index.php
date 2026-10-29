@@ -765,6 +765,41 @@ include '../../includes/header.php';
     </div>
 </div>
 
+<!-- MODAL: Emitir boleta/factura a SUNAT desde una nota de venta -->
+<div class="modal-overlay" id="modal-emitir-sunat">
+    <div class="modal" style="max-width:480px">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="fas fa-file-invoice-dollar" style="color:var(--primary);margin-right:8px"></i>Emitir comprobante a SUNAT
+            </h3>
+            <button class="modal-close" onclick="closeModal('modal-emitir-sunat')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div style="background:var(--surface-2);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:.88rem" id="emi-info">—</div>
+            <div class="form-group">
+                <label class="form-label">Tipo de comprobante</label>
+                <select id="emi-tipo" class="form-control" onchange="emiOnTipo()">
+                    <option value="boleta">Boleta electrónica</option>
+                    <option value="factura">Factura electrónica</option>
+                </select>
+            </div>
+            <div id="emi-nota-factura" style="display:none;font-size:.8rem;color:var(--text-muted);margin:-6px 0 12px">
+                La factura requiere que la venta tenga un cliente con <strong>RUC</strong>. Si es "Cliente General", primero asígnale un cliente con RUC o emite boleta.
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start;background:#fff7ed;border:1px solid #fed7aa;border-radius:var(--radius);padding:10px 12px;font-size:.8rem;color:#9a3412">
+                <i class="fas fa-triangle-exclamation" style="margin-top:2px"></i>
+                <div>Se emite con la <strong>fecha original de la venta</strong>. Emitir comprobantes de días pasados puede ser rechazado por SUNAT fuera de plazo o requerir resumen diario — valídalo con el contador.</div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('modal-emitir-sunat')">Cancelar</button>
+            <button class="btn btn-primary" id="emi-btn" onclick="emiConfirmar()">
+                <i class="fas fa-paper-plane"></i> Emitir a SUNAT
+            </button>
+        </div>
+    </div>
+</div>
+
 <div class="app-toast-container" id="toast-container"></div>
 
 <script src="<?= $base_path ?>assets/vendor/jquery/jquery-3.7.1.min.js"></script>
@@ -1274,8 +1309,10 @@ function rptLoadReporte() {
                     : `<div class="voucher-block"><strong>${v.numero_venta}</strong><span>NOTA DE VENTA</span></div>`;
                 const xmlBtn = v.enlace_xml ? actionIconButton('file-code','Ver XML',v.enlace_xml) : '';
                 const cdrBtn = v.enlace_cdr ? actionIconButton('receipt','Ver CDR',v.enlace_cdr) : '';
+                const esNotaVenta = parseInt(v.comprobante_id||0,10)===0 && v.estado==='completada';
                 const acciones = `<div class="actions-inline">
                     ${actionIconButton('print','Imprimir ticket',null,`rptImprimirTicket(${parseInt(v.id,10)})`)}
+                    ${esNotaVenta ? actionIconButton('file-invoice-dollar','Emitir boleta/factura a SUNAT',null,`rptEmitirDesdeVenta(${parseInt(v.id,10)})`) : ''}
                     ${v.comprobante_id&&v.enlace_cdr&&v.tipo_comprobante!=='ticket' ? actionIconButton('file-circle-plus','Generar nota de crédito',null,`rptAbrirNc(${parseInt(v.comprobante_id,10)})`) : ''}
                     ${v.enlace_pdf ? actionIconButton('file-pdf','Ver PDF',v.enlace_pdf) : ''}
                     ${parseInt(v.comprobante_id||0,10)>0&&v.enlace_xml ? actionIconButton('download','Descargar XML + CDR',null,`facDescargarSunatZip(${parseInt(v.comprobante_id,10)})`) : ''}
@@ -1331,6 +1368,44 @@ function rptReenviarSunat(comprobanteId) {
     })
     .then(async r => { const d=await r.json(); if(!r.ok||d.error) throw new Error(d.message||'No se pudo reenviar.'); showToast(d.message||'Reenviado a SUNAT.','success'); rptBuscar(); })
     .catch(err => showToast(err.message||'Error al reenviar a SUNAT','error'));
+}
+
+// Emitir boleta/factura a SUNAT a partir de una nota de venta (ticket) ya hecha.
+let emiVentaId = null;
+function rptEmitirDesdeVenta(ventaId) {
+    const v = rptMap[String(ventaId)];
+    if (!v) return;
+    emiVentaId = ventaId;
+    document.getElementById('emi-info').innerHTML =
+        `Venta <strong>${esc(v.numero_venta)}</strong> · Total <strong>S/ ${parseFloat(v.total||0).toFixed(2)}</strong><br>` +
+        `Cliente: ${esc(v.cliente||'Cliente General')}`;
+    document.getElementById('emi-tipo').value = 'boleta';
+    emiOnTipo();
+    openModal('modal-emitir-sunat');
+}
+function emiOnTipo() {
+    const esFactura = document.getElementById('emi-tipo').value === 'factura';
+    document.getElementById('emi-nota-factura').style.display = esFactura ? '' : 'none';
+}
+function emiConfirmar() {
+    if (!emiVentaId) return;
+    const btn = document.getElementById('emi-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Emitiendo...';
+    const restore = () => { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Emitir a SUNAT'; };
+    fetch(BASE + 'modules/facturacion/api.php?action=emitir_desde_venta', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ venta_id: emiVentaId, tipo: document.getElementById('emi-tipo').value })
+    })
+    .then(async r => {
+        const d = await r.json();
+        restore();
+        if (!r.ok || d.error) throw new Error(d.message || 'No se pudo emitir.');
+        closeModal('modal-emitir-sunat');
+        showToast(d.message || 'Comprobante emitido.', d.sunat_ok ? 'success' : 'info');
+        rptBuscar();
+    })
+    .catch(err => { restore(); showToast(err.message || 'Error al emitir el comprobante', 'error'); });
 }
 
 function rptBuildTicketHtml(data) {
