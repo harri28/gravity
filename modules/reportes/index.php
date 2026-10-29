@@ -620,6 +620,50 @@ include '../../includes/header.php';
 </div><!-- /rep-pane-paralizado -->
 
 
+<!-- ===================== MODAL: Ítems de la orden de compra ===================== -->
+<div class="modal-overlay" id="modal-oc-items">
+    <div class="modal" style="max-width:640px">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="fas fa-box-open" style="color:var(--primary);margin-right:8px"></i>
+                <span id="oci-titulo">Ítems de la orden</span>
+            </h3>
+            <button class="modal-close" onclick="closeModal('modal-oc-items')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div id="oci-info" style="font-size:.82rem;color:var(--text-muted);margin-bottom:10px">—</div>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr>
+                        <th>Producto</th><th class="text-right">Cant.</th>
+                        <th class="text-right">P. Unit.</th><th class="text-right">Subtotal</th>
+                    </tr></thead>
+                    <tbody id="oci-tabla-body">
+                        <tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div style="font-size:.78rem;color:var(--text-muted);margin-top:8px"><i class="fas fa-circle-info"></i> Haz clic en un producto para ver el resumen histórico de sus compras.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== MODAL: Resumen de compras de un producto ===================== -->
+<div class="modal-overlay" id="modal-prod-resumen">
+    <div class="modal" style="max-width:720px">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="fas fa-chart-line" style="color:var(--primary);margin-right:8px"></i>
+                <span id="pr-titulo">Resumen de compras</span>
+            </h3>
+            <button class="modal-close" onclick="closeModal('modal-prod-resumen')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body" id="pr-body">
+            <div style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></div>
+        </div>
+    </div>
+</div>
+
 <div class="app-toast-container" id="toast-container"></div>
 
 <script>
@@ -729,7 +773,7 @@ function ccBuscar() {
             const badgeEstado = { borrador:'badge-gray', pendiente:'badge-warning', aprobada:'badge-primary', recibida:'badge-success', cancelada:'badge-danger' };
             document.getElementById('cc-tabla-body').innerHTML = rows.map(o => {
                 const dt = new Date(o.created_at);
-                return `<tr>
+                return `<tr style="cursor:pointer" onclick="ccVerItems(${o.id})" title="Ver ítems de la orden">
                     <td><strong>${esc(o.numero_orden)}</strong></td>
                     <td style="font-size:.82rem;color:var(--text-muted)">${dt.toLocaleDateString('es-PE')}</td>
                     <td>${esc(o.proveedor)}</td>
@@ -745,6 +789,82 @@ function ccBuscar() {
 }
 
 function ccExportar() { repDownload(API + '?action=costos_compras_exportar&' + ccParams()); }
+
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// Drill: orden -> items. Clic en una orden del reporte de Costos de Compras.
+function ccVerItems(ordenId) {
+    document.getElementById('oci-titulo').textContent = 'Ítems de la orden';
+    document.getElementById('oci-info').textContent = '—';
+    document.getElementById('oci-tabla-body').innerHTML =
+        '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></td></tr>';
+    openModal('modal-oc-items');
+    fetch(API + '?action=compra_orden_items&orden_id=' + ordenId)
+        .then(r => r.json())
+        .then(d => {
+            if (d.error) { showToast(d.message, 'error'); closeModal('modal-oc-items'); return; }
+            const o = d.orden, items = d.items || [];
+            document.getElementById('oci-titulo').textContent = 'Orden ' + o.numero_orden;
+            document.getElementById('oci-info').innerHTML =
+                `${esc(o.proveedor)} · ${new Date(o.created_at).toLocaleDateString('es-PE')} · <span style="text-transform:capitalize">${esc(o.estado)}</span> · Total ${money(o.total)}`;
+            if (!items.length) {
+                document.getElementById('oci-tabla-body').innerHTML =
+                    '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-light)">Sin ítems</td></tr>';
+                return;
+            }
+            document.getElementById('oci-tabla-body').innerHTML = items.map(it => {
+                const clickable = parseInt(it.producto_id || 0, 10) > 0;
+                const cant = parseFloat(it.cantidad || 0);
+                return `<tr ${clickable ? `style="cursor:pointer" onclick="ccVerResumenProducto(${it.producto_id})" title="Ver resumen histórico de compras"` : ''}>
+                    <td>${esc(it.nombre)}${clickable ? ' <i class="fas fa-chart-line" style="color:var(--primary);font-size:.72rem"></i>' : ''}${it.codigo ? `<div style="font-size:.74rem;color:var(--text-muted);font-family:monospace">${esc(it.codigo)}</div>` : ''}</td>
+                    <td class="text-right">${cant}${it.unidad_medida ? ' <span style="font-size:.72rem;color:var(--text-muted)">' + esc(it.unidad_medida) + '</span>' : ''}</td>
+                    <td class="text-right">${money(it.precio_unitario)}</td>
+                    <td class="text-right"><strong>${money(it.subtotal)}</strong></td>
+                </tr>`;
+            }).join('');
+        })
+        .catch(() => { showToast('Error al cargar los ítems', 'error'); closeModal('modal-oc-items'); });
+}
+
+// Resumen histórico de compras de un producto (todo el periodo).
+function ccVerResumenProducto(prodId) {
+    document.getElementById('pr-titulo').textContent = 'Resumen de compras';
+    document.getElementById('pr-body').innerHTML =
+        '<div style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></div>';
+    openModal('modal-prod-resumen');
+    fetch(API + '?action=compra_producto_resumen&producto_id=' + prodId)
+        .then(r => r.json())
+        .then(d => {
+            if (d.error) { showToast(d.message, 'error'); closeModal('modal-prod-resumen'); return; }
+            const p = d.producto, r = d.resumen || {}, prov = d.por_proveedor || [], hist = d.historial || [];
+            document.getElementById('pr-titulo').textContent = p.nombre + (p.codigo ? ' · ' + p.codigo : '');
+            if (!hist.length) {
+                document.getElementById('pr-body').innerHTML =
+                    '<div style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-box-open"></i><br><br>Este producto no tiene compras registradas.</div>';
+                return;
+            }
+            const stat = (label, val) => `<div style="flex:1;min-width:120px;background:var(--surface-2);border-radius:var(--radius);padding:10px 12px"><div style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em">${label}</div><div style="font-size:1.05rem;font-weight:700">${val}</div></div>`;
+            const cards = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+                ${stat('Total comprado', parseFloat(r.total_cantidad || 0).toFixed(2) + ' u')}
+                ${stat('Total gastado', money(r.total_gastado))}
+                ${stat('N° compras', r.n_compras || 0)}
+                ${stat('P. promedio', money(r.precio_prom))}
+                ${stat('P. mín / máx', money(r.precio_min) + ' / ' + money(r.precio_max))}
+                ${stat('Último precio', r.precio_ultimo != null ? money(r.precio_ultimo) : '—')}
+            </div>`;
+            const provHtml = `<div style="font-weight:700;font-size:.85rem;margin:6px 0">Por proveedor</div>
+                <div class="table-wrap" style="margin-bottom:14px"><table><thead><tr><th>Proveedor</th><th class="text-right">Cant.</th><th class="text-right">Gastado</th><th class="text-right">Compras</th><th class="text-right">P. mín/máx</th></tr></thead><tbody>
+                ${prov.map(pv => `<tr><td>${esc(pv.proveedor)}</td><td class="text-right">${parseFloat(pv.cantidad || 0).toFixed(2)}</td><td class="text-right">${money(pv.gastado)}</td><td class="text-right">${pv.compras}</td><td class="text-right">${money(pv.precio_min)} / ${money(pv.precio_max)}</td></tr>`).join('')}
+                </tbody></table></div>`;
+            const histHtml = `<div style="font-weight:700;font-size:.85rem;margin:6px 0">Historial (${hist.length})</div>
+                <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Orden</th><th>Proveedor</th><th class="text-right">Cant.</th><th class="text-right">P. Unit.</th><th class="text-right">Subtotal</th></tr></thead><tbody>
+                ${hist.map(h => `<tr><td style="font-size:.82rem">${new Date(h.created_at).toLocaleDateString('es-PE')}</td><td style="font-size:.82rem">${esc(h.numero_orden)}</td><td style="font-size:.82rem">${esc(h.proveedor)}</td><td class="text-right">${parseFloat(h.cantidad || 0).toFixed(2)}</td><td class="text-right">${money(h.precio_unitario)}</td><td class="text-right">${money(h.subtotal)}</td></tr>`).join('')}
+                </tbody></table></div>`;
+            document.getElementById('pr-body').innerHTML = cards + provHtml + histHtml;
+        })
+        .catch(() => { showToast('Error al cargar el resumen', 'error'); closeModal('modal-prod-resumen'); });
+}
 
 // ================================================================
 // VENTAS

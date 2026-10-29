@@ -326,6 +326,115 @@ switch ($action) {
         reportesCsvOutput('costos_compras', $stmt->fetchAll(PDO::FETCH_ASSOC));
         break;
 
+    // Items de una orden de compra (para el drill: orden -> items -> resumen).
+    case 'compra_orden_items':
+        $ordenId = (int) ($_GET['orden_id'] ?? 0);
+        if ($ordenId <= 0) {
+            jsonResponse(['error' => true, 'message' => 'Orden no válida'], 422);
+        }
+        try {
+            $ocStmt = $db->prepare("
+                SELECT oc.id, oc.numero_orden, oc.estado, oc.created_at,
+                       oc.subtotal, oc.igv, oc.costo_envio, oc.total,
+                       COALESCE(p.razon_social, 'Sin proveedor') AS proveedor
+                FROM ordenes_compra oc
+                LEFT JOIN proveedores p ON p.id = oc.proveedor_id
+                WHERE oc.id = :id
+            ");
+            $ocStmt->execute([':id' => $ordenId]);
+            $orden = $ocStmt->fetch();
+            if (!$orden) {
+                jsonResponse(['error' => true, 'message' => 'Orden no encontrada'], 404);
+            }
+            $itStmt = $db->prepare("
+                SELECT d.producto_id,
+                       COALESCE(pr.nombre, d.descripcion, 'Producto') AS nombre,
+                       COALESCE(pr.codigo, '') AS codigo,
+                       d.unidad_medida, d.cantidad, d.precio_unitario, d.subtotal
+                FROM orden_compra_detalles d
+                LEFT JOIN productos pr ON pr.id = d.producto_id
+                WHERE d.orden_id = :id
+                ORDER BY d.id
+            ");
+            $itStmt->execute([':id' => $ordenId]);
+            echo json_encode(['orden' => $orden, 'items' => $itStmt->fetchAll()]);
+        } catch (Exception $e) {
+            jsonResponse(['error' => true, 'message' => $e->getMessage()], 500);
+        }
+        break;
+
+    // Resumen histórico (todo el periodo) de las compras de un producto.
+    // Excluye ordenes canceladas. Totales + por proveedor + historial.
+    case 'compra_producto_resumen':
+        $prodId = (int) ($_GET['producto_id'] ?? 0);
+        if ($prodId <= 0) {
+            jsonResponse(['error' => true, 'message' => 'Producto no válido'], 422);
+        }
+        try {
+            $prod = $db->prepare("SELECT nombre, COALESCE(codigo,'') AS codigo FROM productos WHERE id = :id");
+            $prod->execute([':id' => $prodId]);
+            $producto = $prod->fetch() ?: ['nombre' => '(producto eliminado)', 'codigo' => ''];
+
+            $res = $db->prepare("
+                SELECT COALESCE(SUM(d.cantidad), 0)        AS total_cantidad,
+                       COALESCE(SUM(d.subtotal), 0)        AS total_gastado,
+                       COUNT(DISTINCT d.orden_id)          AS n_compras,
+                       COALESCE(AVG(d.precio_unitario), 0) AS precio_prom,
+                       COALESCE(MIN(d.precio_unitario), 0) AS precio_min,
+                       COALESCE(MAX(d.precio_unitario), 0) AS precio_max
+                FROM orden_compra_detalles d
+                JOIN ordenes_compra oc ON oc.id = d.orden_id
+                WHERE d.producto_id = :id AND oc.estado <> 'cancelada'
+            ");
+            $res->execute([':id' => $prodId]);
+            $resumen = $res->fetch();
+
+            $ult = $db->prepare("
+                SELECT d.precio_unitario
+                FROM orden_compra_detalles d
+                JOIN ordenes_compra oc ON oc.id = d.orden_id
+                WHERE d.producto_id = :id AND oc.estado <> 'cancelada'
+                ORDER BY oc.created_at DESC LIMIT 1
+            ");
+            $ult->execute([':id' => $prodId]);
+            $resumen['precio_ultimo'] = $ult->fetch()['precio_unitario'] ?? null;
+
+            $prov = $db->prepare("
+                SELECT COALESCE(p.razon_social, 'Sin proveedor') AS proveedor,
+                       SUM(d.cantidad) AS cantidad, SUM(d.subtotal) AS gastado,
+                       COUNT(DISTINCT d.orden_id) AS compras,
+                       MIN(d.precio_unitario) AS precio_min, MAX(d.precio_unitario) AS precio_max
+                FROM orden_compra_detalles d
+                JOIN ordenes_compra oc ON oc.id = d.orden_id
+                LEFT JOIN proveedores p ON p.id = oc.proveedor_id
+                WHERE d.producto_id = :id AND oc.estado <> 'cancelada'
+                GROUP BY 1 ORDER BY gastado DESC
+            ");
+            $prov->execute([':id' => $prodId]);
+
+            $hist = $db->prepare("
+                SELECT oc.numero_orden, oc.created_at, oc.estado,
+                       COALESCE(p.razon_social, 'Sin proveedor') AS proveedor,
+                       d.cantidad, d.precio_unitario, d.subtotal
+                FROM orden_compra_detalles d
+                JOIN ordenes_compra oc ON oc.id = d.orden_id
+                LEFT JOIN proveedores p ON p.id = oc.proveedor_id
+                WHERE d.producto_id = :id AND oc.estado <> 'cancelada'
+                ORDER BY oc.created_at DESC
+            ");
+            $hist->execute([':id' => $prodId]);
+
+            echo json_encode([
+                'producto'      => $producto,
+                'resumen'       => $resumen,
+                'por_proveedor' => $prov->fetchAll(),
+                'historial'     => $hist->fetchAll(),
+            ]);
+        } catch (Exception $e) {
+            jsonResponse(['error' => true, 'message' => $e->getMessage()], 500);
+        }
+        break;
+
     case 'proveedores_lista':
         try {
             $rows = $db->query("
