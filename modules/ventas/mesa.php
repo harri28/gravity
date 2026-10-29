@@ -145,6 +145,9 @@ include '../../includes/header.php';
                 <span>Total</span>
                 <strong id="comanda-total">S/ 0.00</strong>
             </div>
+            <button class="btn btn-outline" id="btn-precuenta" onclick="imprimirPrecuenta()" style="margin-right:8px">
+                <i class="fas fa-receipt"></i> PRECUENTA
+            </button>
             <button class="btn btn-primary btn-cobrar" id="btn-cobrar" onclick="cobrar()">
                 <i class="fas fa-cash-register"></i> COBRAR
             </button>
@@ -460,6 +463,7 @@ const MESA_ID    = <?= json_encode($resueltaMesaId) ?>;
 // Se crea recien cuando se agrega el primer producto desde el catalogo.
 let COMANDA_ID   = <?= json_encode($resueltaComandaId) ?>;
 const MESA_INFO  = <?= json_encode(['numero' => $mesaInfo['numero'], 'nombre' => $mesaInfo['nombre']], JSON_UNESCAPED_UNICODE) ?>;
+const PRECUENTA_EMPRESA = <?= json_encode(sesionTenantNombre() ?: ($mesaInfo['nombre'] ?? 'Negocio'), JSON_UNESCAPED_UNICODE) ?>;
 const API = 'api.php';
 
 let COMANDA = null;
@@ -596,6 +600,69 @@ function renderItems() {
     const total = ITEMS.reduce((s, it) => s + parseFloat(it.subtotal || 0), 0);
     document.getElementById('comanda-total').textContent = soles(total);
     document.getElementById('btn-cobrar').disabled = totalItems === 0;
+    document.getElementById('btn-precuenta').disabled = totalItems === 0;
+}
+
+// === Precuenta (solo front, documento NO fiscal) ===
+// Imprime el consumo actual de la mesa como pre-ticket para que el cliente lo
+// revise antes de pagar. NO cierra la mesa, NO crea venta, NO toca stock ni va
+// a SUNAT. Se puede reimprimir las veces que haga falta.
+function buildPrecuentaHTML() {
+    const total = ITEMS.reduce((s, it) => s + parseFloat(it.subtotal || 0), 0);
+    const now = new Date();
+    const fecha = now.toLocaleDateString('es-PE', {day:'2-digit', month:'2-digit', year:'numeric'});
+    const hora  = now.toLocaleTimeString('es-PE', {hour:'2-digit', minute:'2-digit'});
+    const mesaNum = COMANDA ? COMANDA.mesa_numero : MESA_INFO.numero;
+    const itemsHtml = ITEMS.map(it => {
+        const cant = parseFloat(it.cantidad) || 0;
+        const cantTxt = Number.isInteger(cant) ? String(cant) : cant.toFixed(2);
+        const pu = parseFloat(it.precio_unitario) || 0;
+        const sub = parseFloat(it.subtotal) || 0;
+        return `<div style="margin-bottom:5px"><div style="display:flex;justify-content:space-between;font-size:9pt"><span style="flex:1;padding-right:6px;word-break:break-word">${escH(it.producto_nombre)}</span><span style="white-space:nowrap;font-weight:700">S/${sub.toFixed(2)}</span></div><div style="font-size:8pt">${cantTxt} x S/${pu.toFixed(2)}</div></div>`;
+    }).join('');
+    return `<div style="font-family:'Arial Narrow',Arial,Helvetica,sans-serif;color:#000;font-size:10pt;line-height:1.5;width:100%;font-weight:500">
+        <div style="text-align:center;margin-bottom:8px">
+            <div style="font-size:12pt;font-weight:900;text-transform:uppercase;letter-spacing:1px">${escH(PRECUENTA_EMPRESA)}</div>
+        </div>
+        <div style="border-top:2px solid #000;border-bottom:2px solid #000;text-align:center;padding:5px 0;margin-bottom:8px">
+            <div style="font-size:11pt;font-weight:800;letter-spacing:2px">PRECUENTA</div>
+            <div style="font-size:7.5pt;font-weight:700">DOCUMENTO NO VÁLIDO COMO COMPROBANTE DE PAGO</div>
+        </div>
+        <div style="font-size:9pt;margin-bottom:6px">
+            <div>Mesa  : ${escH(String(mesaNum))}</div>
+            <div>Fecha : ${fecha} ${hora}</div>
+        </div>
+        <div style="border-top:1px dashed #000;margin:6px 0"></div>
+        <div style="display:flex;justify-content:space-between;font-size:9pt;font-weight:700;margin-bottom:3px"><span>DESCRIPCIÓN</span><span>TOTAL</span></div>
+        <div style="border-top:1px dashed #000;margin:6px 0"></div>
+        <div style="margin-bottom:4px">${itemsHtml}</div>
+        <div style="border-top:2px solid #000;margin:6px 0"></div>
+        <div style="display:flex;justify-content:space-between;font-size:12pt;font-weight:800"><span>TOTAL:</span><span>S/ ${total.toFixed(2)}</span></div>
+        <div style="border-top:2px solid #000;margin:6px 0"></div>
+        <div style="text-align:center;font-size:8pt;margin-top:6px">** Esto NO es una boleta ni factura **<br>Pida su comprobante al momento de pagar</div>
+    </div>`;
+}
+
+function imprimirPrecuenta() {
+    if (!ITEMS.length) { showToast('No hay items en la mesa', 'error'); return; }
+    const inner = buildPrecuentaHTML();
+    // Mismo criterio anti-borroso + 80mm termico que el ticket del POS.
+    const style = `*{margin:0;padding:0;box-sizing:border-box}
+        html,body{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;-webkit-font-smoothing:none;text-rendering:geometricPrecision}
+        body{font-family:'Arial Narrow',Arial,Helvetica,sans-serif;font-size:9pt;font-weight:500;line-height:1.5;color:#000;width:80mm;margin:0 auto;padding:4mm 3mm}`;
+    const w = window.open('', '_blank', 'width=420,height=700');
+    if (!w) { showToast('Habilita las ventanas emergentes para imprimir', 'error'); return; }
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Precuenta</title><style>${style}</style></head><body>${inner}</body></html>`);
+    w.document.close();
+    w.focus();
+    setTimeout(() => {
+        // Alto de pagina dinamico segun el contenido (termica no respeta "auto").
+        const heightMm = Math.ceil(w.document.body.scrollHeight * 0.2646) + 15;
+        const ps = w.document.createElement('style');
+        ps.textContent = `@media print { @page { size:80mm ${heightMm}mm; margin:4mm 3mm; } body { padding:0; } }`;
+        w.document.head.appendChild(ps);
+        w.print();
+    }, 300);
 }
 
 function renderItem(it) {
