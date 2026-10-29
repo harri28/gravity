@@ -234,6 +234,7 @@ CREATE TABLE IF NOT EXISTS mesas (
     numero      VARCHAR(20)   NOT NULL UNIQUE,
     nombre      VARCHAR(80),
     capacidad   INTEGER,
+    color       VARCHAR(7),   -- hex del acento de la tarjeta (ej. '#3b82f6'); NULL = sin color
     activa      BOOLEAN       NOT NULL DEFAULT TRUE,
     created_at  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
 );

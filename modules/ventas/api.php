@@ -608,6 +608,7 @@ switch ($action) {
                    m.numero,
                    m.nombre,
                    m.capacidad,
+                   m.color,
                    c.id                 AS comanda_id,
                    c.hora_apertura,
                    c.usuario_apertura_id,

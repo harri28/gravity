@@ -343,7 +343,7 @@ switch ($action) {
         // ordenados como texto. Sin esto, '10' iba despues de '1' porque
         // numero es VARCHAR y se ordenaba lexicograficamente.
         $stmt = $db->query("
-            SELECT m.id, m.numero, m.nombre, m.capacidad, m.activa, m.created_at,
+            SELECT m.id, m.numero, m.nombre, m.capacidad, m.color, m.activa, m.created_at,
                    c.id AS comanda_abierta_id
             FROM mesas m
             LEFT JOIN comandas c ON c.mesa_id = m.id AND c.estado = 'abierta'
@@ -359,6 +359,11 @@ switch ($action) {
         $numero   = trim($d['numero'] ?? '');
         $nombre   = trim($d['nombre'] ?? '');
         $capacidad = $d['capacidad'] ?? null;
+        // Color: solo se acepta uno de la paleta fija (sin rojo, reservado a OCUPADA);
+        // cualquier otro valor se normaliza a NULL (sin color).
+        $coloresMesa = ['#3b82f6','#6366f1','#14b8a6','#22c55e','#f59e0b','#f97316','#ec4899','#000000'];
+        $color = strtolower(trim((string)($d['color'] ?? '')));
+        $color = in_array($color, $coloresMesa, true) ? $color : null;
 
         if ($numero === '') {
             jsonResponse(['error' => true, 'message' => 'El numero de mesa es requerido'], 400);
@@ -372,14 +377,15 @@ switch ($action) {
 
         try {
             $stmt = $db->prepare("
-                INSERT INTO mesas (numero, nombre, capacidad)
-                VALUES (:n, :nom, :cap)
+                INSERT INTO mesas (numero, nombre, capacidad, color)
+                VALUES (:n, :nom, :cap, :col)
                 RETURNING id
             ");
             $stmt->execute([
                 ':n'   => $numero,
                 ':nom' => $nombre !== '' ? $nombre : null,
                 ':cap' => ($capacidad === null || $capacidad === '') ? null : (int)$capacidad,
+                ':col' => $color,
             ]);
             $nueva_id = $stmt->fetch()['id'];
         } catch (PDOException $e) {
@@ -398,6 +404,9 @@ switch ($action) {
         $numero    = trim($d['numero'] ?? '');
         $nombre    = trim($d['nombre'] ?? '');
         $capacidad = $d['capacidad'] ?? null;
+        $coloresMesa = ['#3b82f6','#6366f1','#14b8a6','#22c55e','#f59e0b','#f97316','#ec4899','#000000'];
+        $color = strtolower(trim((string)($d['color'] ?? '')));
+        $color = in_array($color, $coloresMesa, true) ? $color : null;
 
         if (!$id || $numero === '') {
             jsonResponse(['error' => true, 'message' => 'Datos incompletos'], 400);
@@ -411,12 +420,13 @@ switch ($action) {
 
         try {
             $db->prepare("
-                UPDATE mesas SET numero = :n, nombre = :nom, capacidad = :cap
+                UPDATE mesas SET numero = :n, nombre = :nom, capacidad = :cap, color = :col
                 WHERE id = :id
             ")->execute([
                 ':n'   => $numero,
                 ':nom' => $nombre !== '' ? $nombre : null,
                 ':cap' => ($capacidad === null || $capacidad === '') ? null : (int)$capacidad,
+                ':col' => $color,
                 ':id'  => $id,
             ]);
         } catch (PDOException $e) {

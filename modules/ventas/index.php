@@ -319,6 +319,9 @@ function renderMesa(m) {
     const ocupada = !!m.comanda_id;
     const cls     = ocupada ? 'mesa-ocupada' : 'mesa-libre';
     const nombre  = escH(m.nombre || '');
+    // Barra de acento izquierda con el color de la mesa (si tiene). Convive con
+    // el borde de estado (verde libre / azul ocupada); solo pisa el lado izq.
+    const accent  = m.color ? ` style="border-left:6px solid ${escH(m.color)}"` : '';
     // Libre y ocupada van directo a mesa.php -- el backend decide:
     // para libre, abrir_comanda primero via API; para ocupada, directo.
     const onclick = ocupada
@@ -330,7 +333,7 @@ function renderMesa(m) {
         const total      = formatSoles(m.total_parcial);
         const mozo       = escH(m.usuario_apertura_nombre || '');
         return `
-            <div class="mesa-card ${cls}" onclick="${onclick}">
+            <div class="mesa-card ${cls}" onclick="${onclick}"${accent}>
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
                     <div>
                         <div class="mesa-numero">${escH(m.numero)}</div>
@@ -349,7 +352,7 @@ function renderMesa(m) {
 
     const capacidad = m.capacidad ? `${m.capacidad} personas` : '&nbsp;';
     return `
-        <div class="mesa-card ${cls}" onclick="${onclick}">
+        <div class="mesa-card ${cls}" onclick="${onclick}"${accent}>
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
                 <div>
                     <div class="mesa-numero">${escH(m.numero)}</div>

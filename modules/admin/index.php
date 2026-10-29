@@ -187,6 +187,11 @@ include '../../includes/header.php';
                 <label class="form-label">Capacidad (personas)</label>
                 <input type="number" id="m-capacidad" class="form-control" placeholder="Opcional" min="1" max="999">
             </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label class="form-label">Color (opcional)</label>
+                <div id="m-color-swatches" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+                <input type="hidden" id="m-color" value="">
+            </div>
         </div>
         <div class="modal-footer">
             <button class="btn btn-outline" onclick="closeModal('modal-mesa')">Cancelar</button>
@@ -1258,7 +1263,7 @@ function loadMesas() {
                         ${ocupada ? ' <span class="badge badge-warning" title="Comanda abierta ahora mismo">Ocupada</span>' : ''}
                     </td>
                     <td>
-                        <button class="btn btn-ghost btn-sm" onclick="abrirEditarMesa(${m.id},'${escH(m.numero)}','${escH(m.nombre || '')}',${m.capacidad || 'null'})" title="Editar">
+                        <button class="btn btn-ghost btn-sm" onclick="abrirEditarMesa(${m.id},'${escH(m.numero)}','${escH(m.nombre || '')}',${m.capacidad || 'null'},'${m.color || ''}')" title="Editar">
                             <i class="fas fa-edit"></i>
                         </button>
                         <button class="btn btn-ghost btn-sm" onclick="toggleActivaMesa(${m.id}, ${ocupada ? 'true' : 'false'})" title="${activa ? 'Desactivar' : 'Activar'}">
@@ -1347,6 +1352,28 @@ async function guardarLabels() {
     }
 }
 
+// Paleta de colores de mesa (sin rojo, reservado al estado OCUPADA). Debe
+// coincidir con la validacion del backend (admin/api.php).
+const MESA_COLORES = ['#3b82f6','#6366f1','#14b8a6','#22c55e','#f59e0b','#f97316','#ec4899','#000000'];
+function renderMesaColorSwatches() {
+    const cont = document.getElementById('m-color-swatches');
+    const sel  = (document.getElementById('m-color').value || '').toLowerCase();
+    const px = 19;
+    // "Ninguno": cuadrito blanco con una franja diagonal gris.
+    let html = `<button type="button" title="Ninguno" onclick="seleccionarColorMesa('')"
+        style="width:${px}px;height:${px}px;border-radius:5px;cursor:pointer;padding:0;
+               background:linear-gradient(135deg,#fff 44%,#9ca3af 44%,#9ca3af 56%,#fff 56%);
+               box-shadow:0 0 0 1px #d1d5db;outline:${sel===''?'2px solid #111':'none'};outline-offset:1px"></button>`;
+    html += MESA_COLORES.map(c => `<button type="button" title="${c}" onclick="seleccionarColorMesa('${c}')"
+        style="width:${px}px;height:${px}px;border-radius:5px;cursor:pointer;padding:0;background:${c};
+               box-shadow:0 0 0 1px #d1d5db;outline:${sel===c?'2px solid #111':'none'};outline-offset:1px"></button>`).join('');
+    cont.innerHTML = html;
+}
+function seleccionarColorMesa(c) {
+    document.getElementById('m-color').value = c;
+    renderMesaColorSwatches();
+}
+
 function abrirModalMesa() {
     const Ls = (window.LABELS?.mesa?.s || 'Mesa');
     document.getElementById('modal-mesa-titulo').textContent  = `Nueva ${Ls.toLowerCase()}`;
@@ -1354,18 +1381,22 @@ function abrirModalMesa() {
     document.getElementById('m-numero').value     = '';
     document.getElementById('m-nombre').value     = '';
     document.getElementById('m-capacidad').value  = '';
+    document.getElementById('m-color').value      = '';
+    renderMesaColorSwatches();
     document.getElementById('btn-guardar-mesa').innerHTML = `<i class="fas fa-save"></i> Crear ${Ls.toLowerCase()}`;
     openModal('modal-mesa');
     setTimeout(() => document.getElementById('m-numero').focus(), 80);
 }
 
-function abrirEditarMesa(id, numero, nombre, capacidad) {
+function abrirEditarMesa(id, numero, nombre, capacidad, color) {
     const Ls = (window.LABELS?.mesa?.s || 'Mesa');
     document.getElementById('modal-mesa-titulo').textContent  = `Editar ${Ls.toLowerCase()}`;
     document.getElementById('m-id').value        = id;
     document.getElementById('m-numero').value    = numero;
     document.getElementById('m-nombre').value    = nombre;
     document.getElementById('m-capacidad').value = capacidad == null ? '' : capacidad;
+    document.getElementById('m-color').value     = color || '';
+    renderMesaColorSwatches();
     document.getElementById('btn-guardar-mesa').innerHTML = '<i class="fas fa-save"></i> Guardar cambios';
     openModal('modal-mesa');
 }
@@ -1386,8 +1417,9 @@ function guardarMesa() {
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
 
+    const color  = document.getElementById('m-color').value;
     const action = id ? 'mesa_actualizar' : 'mesa_crear';
-    const body   = id ? { id, numero, nombre, capacidad } : { numero, nombre, capacidad };
+    const body   = id ? { id, numero, nombre, capacidad, color } : { numero, nombre, capacidad, color };
 
     post(action, body).then(d => {
         btn.disabled = false;
