@@ -1412,6 +1412,21 @@ function rptBuildTicketHtml(data) {
     const items = Array.isArray(data.items)?data.items:[];
     const total=parseFloat(data.total||0), subtotal=parseFloat(data.subtotal||0);
     const descuento=parseFloat(data.descuento||0), igv=parseFloat(data.igv||0);
+    // Desglose por afectacion calculado de los items (igual que el XML a SUNAT),
+    // no hardcodeado: asi exonerado/inafecto NO muestran IGV.
+    let opGravada=0, opExonerada=0, opInafecta=0, igvCalc=0;
+    items.forEach(it => {
+        const cod = String(it.afectacion_igv_codigo||'10');
+        const vt = parseFloat(it.valor_total||0)||0;
+        if (['20','21'].includes(cod)) opExonerada += vt;
+        else if (['30','31','32','33','34','35','36'].includes(cod)) opInafecta += vt;
+        else opGravada += vt;
+        igvCalc += parseFloat(it.igv||0)||0;
+    });
+    if (opGravada + opExonerada + opInafecta === 0) { // fallback si los items no traen desglose
+        if (igv > 0) opGravada = subtotal; else opExonerada = total;
+        igvCalc = igv;
+    }
     const tipo=String(data.tipo_comprobante||'').toLowerCase();
     const compLabel = tipo==='factura'?'FACTURA DE VENTA ELECTRÓNICA':(tipo==='boleta'?'BOLETA DE VENTA ELECTRÓNICA':'TICKET DE VENTA');
     const compNumero = data.comprobante_numero||data.numero_venta||'---';
@@ -1447,9 +1462,11 @@ function rptBuildTicketHtml(data) {
         <div style="margin-bottom:4px">${itemsHtml}</div>
         <div style="border-top:1px dashed #000;margin:6px 0"></div>
         <div style="font-size:9pt;margin:4px 0">
-            <div style="display:flex;justify-content:space-between;gap:10px"><span>OP. GRAVADA:</span><span>S/ ${subtotal.toFixed(2)}</span></div>
+            ${opGravada>0?`<div style="display:flex;justify-content:space-between;gap:10px"><span>OP. GRAVADA:</span><span>S/ ${opGravada.toFixed(2)}</span></div>`:''}
+            ${opExonerada>0?`<div style="display:flex;justify-content:space-between;gap:10px"><span>OP. EXONERADA:</span><span>S/ ${opExonerada.toFixed(2)}</span></div>`:''}
+            ${opInafecta>0?`<div style="display:flex;justify-content:space-between;gap:10px"><span>OP. INAFECTA:</span><span>S/ ${opInafecta.toFixed(2)}</span></div>`:''}
             ${descuento>0?`<div style="display:flex;justify-content:space-between;gap:10px"><span>DESCUENTO:</span><span>-S/ ${descuento.toFixed(2)}</span></div>`:''}
-            <div style="display:flex;justify-content:space-between;gap:10px"><span>IGV (18%):</span><span>S/ ${igv.toFixed(2)}</span></div>
+            ${igvCalc>0?`<div style="display:flex;justify-content:space-between;gap:10px"><span>IGV (18%):</span><span>S/ ${igvCalc.toFixed(2)}</span></div>`:''}
         </div>
         <div style="border-top:2px solid #000;margin:6px 0"></div>
         <div style="display:flex;justify-content:space-between;font-size:11pt;font-weight:800;line-height:1.6"><span>TOTAL:</span><span>S/ ${total.toFixed(2)}</span></div>
