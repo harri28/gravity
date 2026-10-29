@@ -259,7 +259,7 @@ function facturacionEmitirComprobanteDesdeVenta(PDO $db, int $ventaId, string $t
             UPDATE ventas
             SET tipo_comprobante = :tipo, serie = :serie, correlativo = :correlativo,
                 codigo_tipo_documento = :cod, tipo_documento_id = :tdid,
-                cliente_id = COALESCE(:cliid, cliente_id), updated_at = NOW()
+                cliente_id = COALESCE(:cliid, cliente_id)
             WHERE id = :id
         ")->execute([
             ':tipo' => $tipo, ':serie' => $serie, ':correlativo' => $correlativo,
