@@ -680,7 +680,7 @@ include '../../includes/header.php';
                 <table>
                     <thead><tr>
                         <th>Fecha</th><th>Comprobante</th><th>Cliente</th>
-                        <th class="text-right">Total</th><th>Estado</th>
+                        <th style="text-align:left;white-space:nowrap">Total</th><th>Estado</th>
                     </tr></thead>
                     <tbody id="vtv-tabla-body">
                         <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></td></tr>
@@ -992,7 +992,7 @@ function vtVerVentas(i) {
                     <td style="font-size:.82rem">${dt.toLocaleDateString('es-PE')} ${dt.toLocaleTimeString('es-PE', {hour:'2-digit', minute:'2-digit'})}</td>
                     <td><strong>${esc(comp)}</strong><div style="font-size:.72rem;color:var(--text-muted)">${esc(tipo)}</div></td>
                     <td style="font-size:.85rem">${esc(v.cliente)}</td>
-                    <td class="text-right"><strong>${money(v.total)}</strong></td>
+                    <td style="text-align:left;white-space:nowrap"><strong>${money(v.total)}</strong></td>
                     <td><span class="badge ${anulada ? 'badge-danger' : 'badge-success'}">${anulada ? 'Anulada' : 'Vigente'}</span></td>
                 </tr>`;
             }).join('');
