@@ -503,7 +503,8 @@ switch ($action) {
         }
         try {
             $stmt = $db->prepare("
-                SELECT v.numero_venta, v.created_at, v.total, v.tipo_comprobante, v.estado,
+                SELECT v.numero_venta, v.created_at, v.total, v.igv, v.tipo_comprobante,
+                       v.tipo_pago, v.estado,
                        COALESCE(NULLIF(TRIM(c.nombres || ' ' || COALESCE(c.apellidos,'')),''),
                                 c.razon_social, c.nombre_completo, 'Cliente General') AS cliente,
                        COALESCE(ce.numero_completo, '') AS comprobante_numero

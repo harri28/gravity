@@ -666,27 +666,16 @@ include '../../includes/header.php';
 
 <!-- ===================== MODAL: Ventas de un vendedor ===================== -->
 <div class="modal-overlay" id="modal-vt-ventas">
-    <div class="modal" style="max-width:720px">
+    <div class="modal" style="max-width:860px">
         <div class="modal-header">
             <h3 class="modal-title">
                 <i class="fas fa-user-tag" style="color:var(--primary);margin-right:8px"></i>
-                <span id="vtv-titulo">Ventas del vendedor</span>
+                <span id="vtv-titulo">Resumen de ventas</span>
             </h3>
             <button class="modal-close" onclick="closeModal('modal-vt-ventas')"><i class="fas fa-times"></i></button>
         </div>
-        <div class="modal-body">
-            <div id="vtv-info" style="font-size:.82rem;color:var(--text-muted);margin-bottom:10px">—</div>
-            <div class="table-wrap">
-                <table>
-                    <thead><tr>
-                        <th>Fecha</th><th>Comprobante</th><th>Cliente</th>
-                        <th style="text-align:left;white-space:nowrap">Total</th><th>Estado</th>
-                    </tr></thead>
-                    <tbody id="vtv-tabla-body">
-                        <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></td></tr>
-                    </tbody>
-                </table>
-            </div>
+        <div class="modal-body" id="vtv-body">
+            <div style="text-align:center;padding:40px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></div>
         </div>
     </div>
 </div>
@@ -958,46 +947,134 @@ function vtExportar() { repDownload(API + '?action=ventas_exportar&' + vtParams(
 
 // Drill del reporte de Ventas por vendedor: ventas individuales del vendedor
 // en el mismo rango de fechas del filtro.
+const VTV_METODO_LABEL = { efectivo:'Efectivo', yape:'Yape', plin:'Plin', tarjeta:'Visa/Mastercard', transferencia:'Transferencia', credito:'Crédito' };
+function vtvMetodoLabel(m) {
+    const k = (m || '').toLowerCase();
+    return VTV_METODO_LABEL[k] || (m ? m.charAt(0).toUpperCase() + m.slice(1) : 'Otro');
+}
+function vtvTipoLabel(t) {
+    const k = (t || '').toLowerCase();
+    if (k === 'boleta') return 'Boleta';
+    if (k === 'factura') return 'Factura';
+    if (k === 'nota_venta' || k === 'ticket' || k === '') return 'Nota de venta';
+    return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
 function vtVerVentas(i) {
     const row = vtRows[i];
     if (!row) return;
     const vendedor = row.etiqueta;
     const desde = document.getElementById('vt-desde').value;
     const hasta = document.getElementById('vt-hasta').value;
-    document.getElementById('vtv-titulo').textContent = 'Ventas de ' + vendedor;
-    document.getElementById('vtv-info').textContent = '—';
-    document.getElementById('vtv-tabla-body').innerHTML =
-        '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></td></tr>';
+    document.getElementById('vtv-titulo').textContent = 'Resumen de ventas — ' + vendedor;
+    document.getElementById('vtv-body').innerHTML =
+        '<div style="text-align:center;padding:40px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></div>';
     openModal('modal-vt-ventas');
     fetch(API + '?action=ventas_por_vendedor&vendedor=' + encodeURIComponent(vendedor) + '&desde=' + encodeURIComponent(desde) + '&hasta=' + encodeURIComponent(hasta))
         .then(r => r.json())
         .then(data => {
             if (data.error) { showToast(data.message, 'error'); closeModal('modal-vt-ventas'); return; }
             const ventas = Array.isArray(data) ? data : [];
-            const completadas = ventas.filter(v => v.estado === 'completada');
-            const totalComp = completadas.reduce((a, v) => a + parseFloat(v.total || 0), 0);
-            document.getElementById('vtv-info').innerHTML =
-                `${ventas.length} venta(s) · ${completadas.length} vigente(s) · Total vigente ${money(totalComp)}`;
             if (!ventas.length) {
-                document.getElementById('vtv-tabla-body').innerHTML =
-                    '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-light)">Sin ventas en el periodo</td></tr>';
+                document.getElementById('vtv-body').innerHTML =
+                    '<div style="text-align:center;padding:40px;color:var(--text-light)">Sin ventas en el periodo</div>';
                 return;
             }
-            document.getElementById('vtv-tabla-body').innerHTML = ventas.map(v => {
-                const anulada = v.estado !== 'completada';
-                const comp = v.comprobante_numero || v.numero_venta;
-                const tipo = v.comprobante_numero ? (v.tipo_comprobante || '').toUpperCase() : 'NOTA DE VENTA';
-                const dt = new Date(v.created_at);
-                return `<tr${anulada ? ' style="opacity:.55"' : ''}>
-                    <td style="font-size:.82rem;white-space:nowrap">${dt.toLocaleDateString('es-PE')} ${dt.toLocaleTimeString('es-PE', {hour:'2-digit', minute:'2-digit'})}</td>
-                    <td><strong>${esc(comp)}</strong><div style="font-size:.72rem;color:var(--text-muted)">${esc(tipo)}</div></td>
-                    <td style="font-size:.85rem">${esc(v.cliente)}</td>
-                    <td style="text-align:left;white-space:nowrap"><strong>${money(v.total)}</strong></td>
-                    <td><span class="badge ${anulada ? 'badge-danger' : 'badge-success'}">${anulada ? 'Anulada' : 'Vigente'}</span></td>
-                </tr>`;
-            }).join('');
+            document.getElementById('vtv-body').innerHTML = vtvRender(ventas);
         })
         .catch(() => { showToast('Error al cargar las ventas', 'error'); closeModal('modal-vt-ventas'); });
+}
+
+function vtvRender(ventas) {
+    const vigentes  = ventas.filter(v => v.estado === 'completada');
+    const anuladas  = ventas.filter(v => v.estado !== 'completada');
+    const ingresos  = vigentes.reduce((a, v) => a + parseFloat(v.total || 0), 0);
+    const igvTot    = vigentes.reduce((a, v) => a + parseFloat(v.igv   || 0), 0);
+    const ticket    = vigentes.length ? ingresos / vigentes.length : 0;
+    const fechas    = ventas.map(v => new Date(v.created_at)).sort((a, b) => a - b);
+    const primera   = fechas[0], ultima = fechas[fechas.length - 1];
+
+    // Agrupaciones (solo ventas vigentes)
+    const porComp = {}, porMet = {};
+    vigentes.forEach(v => {
+        const t = vtvTipoLabel(v.comprobante_numero ? v.tipo_comprobante : 'nota_venta');
+        porComp[t] = porComp[t] || { n: 0, total: 0 };
+        porComp[t].n++; porComp[t].total += parseFloat(v.total || 0);
+        const m = vtvMetodoLabel(v.tipo_pago);
+        porMet[m] = porMet[m] || { n: 0, total: 0 };
+        porMet[m].n++; porMet[m].total += parseFloat(v.total || 0);
+    });
+    const compRows = Object.keys(porComp).sort((a, b) => porComp[b].total - porComp[a].total);
+    const metRows  = Object.keys(porMet).sort((a, b) => porMet[b].total - porMet[a].total);
+
+    const tile = (label, val, accent) => `
+        <div style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px">
+            <div style="font-size:.68rem;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted)">${label}</div>
+            <div style="font-size:1.15rem;font-weight:700;margin-top:3px;color:${accent || 'var(--text)'}">${val}</div>
+        </div>`;
+    const dateTile = (label, val) => `
+        <div style="flex:1;min-width:160px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px">
+            <div style="font-size:.68rem;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted)">${label}</div>
+            <div style="font-size:1rem;font-weight:600;margin-top:3px">${val}</div>
+        </div>`;
+
+    const miniTable = (titulo, rows, obj, col1) => `
+        <div style="flex:1;min-width:260px">
+            <div style="font-weight:600;margin:4px 0 6px">${titulo}</div>
+            <div class="table-wrap"><table style="width:100%">
+                <thead><tr>
+                    <th>${col1}</th>
+                    <th style="text-align:center">N°</th>
+                    <th style="text-align:right">Total</th>
+                </tr></thead>
+                <tbody>${rows.map(k => `<tr>
+                    <td style="font-size:.85rem">${esc(k)}</td>
+                    <td style="text-align:center">${obj[k].n}</td>
+                    <td style="text-align:right;white-space:nowrap">${money(obj[k].total)}</td>
+                </tr>`).join('')}</tbody>
+            </table></div>
+        </div>`;
+
+    const histBody = ventas.map(v => {
+        const anulada = v.estado !== 'completada';
+        const comp = v.comprobante_numero || v.numero_venta;
+        const tipo = vtvTipoLabel(v.comprobante_numero ? v.tipo_comprobante : 'nota_venta');
+        const dt = new Date(v.created_at);
+        return `<tr${anulada ? ' style="opacity:.55"' : ''}>
+            <td style="white-space:nowrap"><strong>${esc(v.numero_venta)}</strong></td>
+            <td style="font-size:.82rem;white-space:nowrap">${dt.toLocaleDateString('es-PE')}</td>
+            <td style="font-size:.85rem">${esc(v.cliente)}</td>
+            <td style="font-size:.85rem;white-space:nowrap">${esc(comp)}<div style="font-size:.72rem;color:var(--text-muted)">${esc(tipo)}</div></td>
+            <td style="font-size:.85rem;white-space:nowrap">${esc(vtvMetodoLabel(v.tipo_pago))}</td>
+            <td style="text-align:left;white-space:nowrap"><strong>${money(v.total)}</strong></td>
+            <td><span class="badge ${anulada ? 'badge-danger' : 'badge-success'}">${anulada ? 'Anulada' : 'Completada'}</span></td>
+        </tr>`;
+    }).join('');
+
+    return `
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+            ${tile('N° ventas', vigentes.length)}
+            ${tile('Ingresos', money(ingresos), 'var(--success)')}
+            ${tile('Ticket prom.', money(ticket))}
+            ${tile('IGV', money(igvTot))}
+            ${tile('Anuladas', anuladas.length, anuladas.length ? 'var(--danger)' : 'var(--text)')}
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+            ${dateTile('Primera venta', primera ? primera.toLocaleDateString('es-PE') : '—')}
+            ${dateTile('Última venta', ultima ? ultima.toLocaleDateString('es-PE') : '—')}
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:20px;margin-bottom:16px">
+            ${miniTable('Por comprobante', compRows, porComp, 'Tipo')}
+            ${miniTable('Por método de pago', metRows, porMet, 'Método')}
+        </div>
+        <div style="font-weight:600;margin:4px 0 6px">Historial de ventas</div>
+        <div class="table-wrap"><table style="width:100%">
+            <thead><tr>
+                <th>N° venta</th><th>Fecha</th><th>Cliente</th><th>Comprobante</th>
+                <th>Método</th><th style="text-align:left">Total</th><th>Estado</th>
+            </tr></thead>
+            <tbody>${histBody}</tbody>
+        </table></div>`;
 }
 
 // ================================================================
