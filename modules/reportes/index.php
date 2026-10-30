@@ -989,7 +989,7 @@ function vtVerVentas(i) {
                 const tipo = v.comprobante_numero ? (v.tipo_comprobante || '').toUpperCase() : 'NOTA DE VENTA';
                 const dt = new Date(v.created_at);
                 return `<tr${anulada ? ' style="opacity:.55"' : ''}>
-                    <td style="font-size:.82rem">${dt.toLocaleDateString('es-PE')} ${dt.toLocaleTimeString('es-PE', {hour:'2-digit', minute:'2-digit'})}</td>
+                    <td style="font-size:.82rem;white-space:nowrap">${dt.toLocaleDateString('es-PE')} ${dt.toLocaleTimeString('es-PE', {hour:'2-digit', minute:'2-digit'})}</td>
                     <td><strong>${esc(comp)}</strong><div style="font-size:.72rem;color:var(--text-muted)">${esc(tipo)}</div></td>
                     <td style="font-size:.85rem">${esc(v.cliente)}</td>
                     <td style="text-align:left;white-space:nowrap"><strong>${money(v.total)}</strong></td>
