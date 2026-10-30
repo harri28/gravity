@@ -66,7 +66,10 @@ function dashRango(): array {
     ];
 }
 
-function dashKpisPeriodo(PDO $db, string $ini, string $fin, bool $admin): array {
+// KPIs del periodo. El filtro de ventas ($cond sin alias / $condV con alias "v.")
+// puede ser por rango de fechas o por caja (turno). Las compras no estan amarradas
+// a la caja, asi que siempre se filtran por una ventana de tiempo ($comprasIni/$comprasFin).
+function dashKpisPeriodo(PDO $db, string $cond, string $condV, array $params, string $comprasIni, string $comprasFin, bool $admin): array {
     $s = $db->prepare("
         SELECT
             COUNT(*) FILTER (WHERE estado = 'completada') AS total_ventas,
@@ -74,9 +77,9 @@ function dashKpisPeriodo(PDO $db, string $ini, string $fin, bool $admin): array 
             COALESCE(AVG(total) FILTER (WHERE estado = 'completada'), 0) AS ticket_promedio,
             COUNT(*) FILTER (WHERE estado = 'anulada') AS anuladas
         FROM ventas
-        WHERE created_at BETWEEN :ini AND :fin
+        WHERE $cond
     ");
-    $s->execute([':ini' => $ini, ':fin' => $fin]);
+    $s->execute($params);
     $r = $s->fetch();
     $out = [
         'total_ventas'    => (int) $r['total_ventas'],
@@ -92,22 +95,62 @@ function dashKpisPeriodo(PDO $db, string $ini, string $fin, bool $admin): array 
             FROM ventas v
             JOIN venta_detalles vd ON vd.venta_id = v.id
             JOIN productos p       ON p.id = vd.producto_id
-            WHERE v.estado = 'completada' AND v.created_at BETWEEN :ini AND :fin
+            WHERE v.estado = 'completada' AND $condV
         ");
-        $g->execute([':ini' => $ini, ':fin' => $fin]);
+        $g->execute($params);
         $out['ganancia'] = (float) $g->fetchColumn();
 
         $c = $db->prepare("
             SELECT COALESCE(SUM(total), 0) AS monto, COUNT(*) AS n
             FROM ordenes_compra
-            WHERE estado <> 'cancelada' AND created_at BETWEEN :ini AND :fin
+            WHERE estado <> 'cancelada' AND created_at BETWEEN :cini AND :cfin
         ");
-        $c->execute([':ini' => $ini, ':fin' => $fin]);
+        $c->execute([':cini' => $comprasIni, ':cfin' => $comprasFin]);
         $cr = $c->fetch();
         $out['compras']   = (float) $cr['monto'];
         $out['compras_n'] = (int) $cr['n'];
     }
     return $out;
+}
+
+// Estructura de KPIs en cero (cuando no hay turno anterior con que comparar).
+function dashKpisVacio(bool $admin): array {
+    $o = ['total_ventas' => 0, 'ingresos' => 0.0, 'ticket_promedio' => 0.0, 'anuladas' => 0];
+    if ($admin) { $o['ganancia'] = 0.0; $o['compras'] = 0.0; $o['compras_n'] = 0; }
+    return $o;
+}
+
+// Caja abierta del usuario en sesion (el "turno" actual). Null si no tiene ninguna.
+function dashTurnoCaja(PDO $db): ?array {
+    $s = $db->prepare("SELECT * FROM cajas WHERE estado = 'abierta' AND usuario_id = :uid ORDER BY apertura_at DESC LIMIT 1");
+    $s->execute([':uid' => (int) sesionId()]);
+    $c = $s->fetch();
+    return $c ?: null;
+}
+
+// Ultimo turno cerrado del usuario (para el comparativo "vs turno anterior").
+function dashTurnoCajaPrev(PDO $db): ?array {
+    $s = $db->prepare("SELECT * FROM cajas WHERE estado = 'cerrada' AND usuario_id = :uid AND cierre_at IS NOT NULL ORDER BY cierre_at DESC LIMIT 1");
+    $s->execute([':uid' => (int) sesionId()]);
+    $c = $s->fetch();
+    return $c ?: null;
+}
+
+// Filtro de ventas para serie/metodos/top: por caja (turno) o por rango de fechas.
+// Si piden 'turno' pero no hay caja abierta, cae a 'hoy'.
+function dashVentasFiltro(PDO $db): array {
+    $p = $_GET['periodo'] ?? 'hoy';
+    if ($p === 'turno') {
+        $caja = dashTurnoCaja($db);
+        if ($caja) {
+            return ['modo' => 'turno', 'cond' => 'caja_id = :cid', 'condV' => 'v.caja_id = :cid',
+                    'params' => [':cid' => (int) $caja['id']], 'caja' => $caja];
+        }
+        $_GET['periodo'] = 'hoy';
+    }
+    $r = dashRango();
+    return ['modo' => 'rango', 'cond' => 'created_at BETWEEN :ini AND :fin', 'condV' => 'v.created_at BETWEEN :ini AND :fin',
+            'params' => [':ini' => $r['ini'], ':fin' => $r['fin']], 'rango' => $r];
 }
 
 switch ($action) {
@@ -275,18 +318,102 @@ switch ($action) {
 
     // ---- GET: KPIs del periodo elegido + periodo anterior (comparativo) ----
     case 'kpis':
-        $r     = dashRango();
-        $admin = isAdmin();
+        $admin   = isAdmin();
+        $periodo = $_GET['periodo'] ?? 'hoy';
+
+        // --- Turno: filtra por la caja abierta del usuario; compara vs su ultimo turno cerrado ---
+        if ($periodo === 'turno' && ($caja = dashTurnoCaja($db))) {
+            $ahora  = date('Y-m-d H:i:s');
+            $actual = dashKpisPeriodo($db, 'caja_id = :cid', 'v.caja_id = :cid', [':cid' => (int) $caja['id']],
+                                      $caja['apertura_at'], $ahora, $admin);
+            $prev = dashTurnoCajaPrev($db);
+            if ($prev) {
+                $anterior = dashKpisPeriodo($db, 'caja_id = :cid', 'v.caja_id = :cid', [':cid' => (int) $prev['id']],
+                                            $prev['apertura_at'], ($prev['cierre_at'] ?: $prev['apertura_at']), $admin);
+            } else {
+                $anterior = dashKpisVacio($admin);
+            }
+            echo json_encode([
+                'modo'           => 'turno',
+                'caja'           => ['apertura_at' => $caja['apertura_at'], 'responsable' => $caja['usuario_apertura']],
+                'tiene_anterior' => (bool) $prev,
+                'actual'         => $actual,
+                'anterior'       => $anterior,
+            ]);
+            break;
+        }
+
+        // --- Rango (incluye el fallback de 'turno' sin caja abierta) ---
+        if ($periodo === 'turno') $_GET['periodo'] = 'hoy';
+        $r = dashRango();
         echo json_encode([
-            'rango'    => $r,
-            'actual'   => dashKpisPeriodo($db, $r['ini'], $r['fin'], $admin),
-            'anterior' => dashKpisPeriodo($db, $r['ini_prev'], $r['fin_prev'], $admin),
+            'modo'           => 'rango',
+            'rango'          => $r,
+            'tiene_anterior' => true,
+            'actual'         => dashKpisPeriodo($db, 'created_at BETWEEN :ini AND :fin', 'v.created_at BETWEEN :ini AND :fin',
+                                                [':ini' => $r['ini'], ':fin' => $r['fin']], $r['ini'], $r['fin'], $admin),
+            'anterior'       => dashKpisPeriodo($db, 'created_at BETWEEN :ini AND :fin', 'v.created_at BETWEEN :ini AND :fin',
+                                                [':ini' => $r['ini_prev'], ':fin' => $r['fin_prev']], $r['ini_prev'], $r['fin_prev'], $admin),
         ]);
         break;
 
     // ---- GET: Serie diaria (ingresos, ventas y ganancia si es admin) ----
     case 'serie':
-        $r = dashRango();
+        $f = dashVentasFiltro($db);
+
+        // --- Turno: serie por HORA desde la apertura de caja hasta ahora ---
+        if ($f['modo'] === 'turno') {
+            $s = $db->prepare("
+                SELECT date_trunc('hour', created_at) AS hora,
+                       COUNT(*) FILTER (WHERE estado = 'completada') AS total_ventas,
+                       COALESCE(SUM(total) FILTER (WHERE estado = 'completada'), 0) AS ingresos
+                FROM ventas
+                WHERE {$f['cond']}
+                GROUP BY 1
+            ");
+            $s->execute($f['params']);
+            $map = [];
+            foreach ($s->fetchAll() as $row) $map[substr($row['hora'], 0, 13)] = $row;
+
+            $gan = [];
+            if (isAdmin()) {
+                $g = $db->prepare("
+                    SELECT date_trunc('hour', v.created_at) AS hora,
+                           COALESCE(SUM(vd.subtotal - vd.cantidad * p.precio_compra), 0) AS ganancia
+                    FROM ventas v
+                    JOIN venta_detalles vd ON vd.venta_id = v.id
+                    JOIN productos p       ON p.id = vd.producto_id
+                    WHERE v.estado = 'completada' AND {$f['condV']}
+                    GROUP BY 1
+                ");
+                $g->execute($f['params']);
+                foreach ($g->fetchAll() as $row) $gan[substr($row['hora'], 0, 13)] = (float) $row['ganancia'];
+            }
+
+            $serie = [];
+            $cur = new DateTime($f['caja']['apertura_at']);
+            $cur->setTime((int) $cur->format('H'), 0, 0);   // alinear a la hora en punto
+            $fin = new DateTime('now');
+            $guard = 0;
+            while ($cur <= $fin && $guard < 48) {            // tope de 48 buckets por seguridad
+                $k = $cur->format('Y-m-d H');
+                $item = [
+                    'fecha'        => $cur->format('Y-m-d H:i'),
+                    'hora_label'   => $cur->format('H:i'),
+                    'total_ventas' => (int) ($map[$k]['total_ventas'] ?? 0),
+                    'ingresos'     => (float) ($map[$k]['ingresos'] ?? 0),
+                ];
+                if (isAdmin()) $item['ganancia'] = $gan[$k] ?? 0;
+                $serie[] = $item;
+                $cur->modify('+1 hour');
+                $guard++;
+            }
+            echo json_encode($serie);
+            break;
+        }
+
+        // --- Rango: serie diaria ---
+        $r = $f['rango'];
         $s = $db->prepare("
             SELECT DATE(created_at) AS fecha,
                    COUNT(*) FILTER (WHERE estado = 'completada') AS total_ventas,
@@ -317,13 +444,13 @@ switch ($action) {
         $serie = [];
         $cur   = new DateTime($r['desde']);
         for ($i = 0; $i < $r['dias']; $i++) {
-            $f = $cur->format('Y-m-d');
+            $fe = $cur->format('Y-m-d');
             $item = [
-                'fecha'        => $f,
-                'total_ventas' => (int) ($map[$f]['total_ventas'] ?? 0),
-                'ingresos'     => (float) ($map[$f]['ingresos'] ?? 0),
+                'fecha'        => $fe,
+                'total_ventas' => (int) ($map[$fe]['total_ventas'] ?? 0),
+                'ingresos'     => (float) ($map[$fe]['ingresos'] ?? 0),
             ];
-            if (isAdmin()) $item['ganancia'] = $gan[$f] ?? 0;
+            if (isAdmin()) $item['ganancia'] = $gan[$fe] ?? 0;
             $serie[] = $item;
             $cur->modify('+1 day');
         }
@@ -332,21 +459,21 @@ switch ($action) {
 
     // ---- GET: Metodos de pago del periodo ----
     case 'metodos_periodo':
-        $r = dashRango();
+        $f = dashVentasFiltro($db);
         $s = $db->prepare("
             SELECT tipo_pago, COUNT(*) AS total_ventas, COALESCE(SUM(total), 0) AS monto
             FROM ventas
-            WHERE estado = 'completada' AND created_at BETWEEN :ini AND :fin
+            WHERE estado = 'completada' AND {$f['cond']}
             GROUP BY tipo_pago
             ORDER BY monto DESC
         ");
-        $s->execute([':ini' => $r['ini'], ':fin' => $r['fin']]);
+        $s->execute($f['params']);
         echo json_encode($s->fetchAll());
         break;
 
     // ---- GET: Top 5 productos del periodo (metrica: unidades|ingresos|ganancia) ----
     case 'top_periodo':
-        $r       = dashRango();
+        $f       = dashVentasFiltro($db);
         $metrica = $_GET['metrica'] ?? 'unidades';
         if (!in_array($metrica, ['unidades', 'ingresos', 'ganancia'], true)) $metrica = 'unidades';
         if ($metrica === 'ganancia' && !isAdmin()) $metrica = 'unidades';
@@ -359,12 +486,12 @@ switch ($action) {
             JOIN venta_detalles vd ON vd.venta_id = v.id
             JOIN productos p       ON p.id = vd.producto_id
             LEFT JOIN public.categorias c ON c.id = p.categoria_id
-            WHERE v.estado = 'completada' AND v.created_at BETWEEN :ini AND :fin
+            WHERE v.estado = 'completada' AND {$f['condV']}
             GROUP BY p.id, p.nombre, p.laboratorio, c.nombre
             ORDER BY $metrica DESC
             LIMIT 5
         ");
-        $s->execute([':ini' => $r['ini'], ':fin' => $r['fin']]);
+        $s->execute($f['params']);
         $rows = $s->fetchAll();
         if (!isAdmin()) foreach ($rows as &$row) unset($row['ganancia']);
         unset($row);
@@ -373,8 +500,8 @@ switch ($action) {
 
     // ---- GET: Detalle de ventas (drill-down al hacer clic en un dia / metodo) ----
     case 'ventas_lista':
-        $r      = dashRango();
-        $params = [':ini' => $r['ini'], ':fin' => $r['fin']];
+        $f      = dashVentasFiltro($db);
+        $params = $f['params'];
         $where  = '';
         $tp = trim($_GET['tipo_pago'] ?? '');
         if ($tp !== '') { $where = ' AND v.tipo_pago = :tp'; $params[':tp'] = $tp; }
@@ -383,7 +510,7 @@ switch ($action) {
                    COALESCE(c.nombres || ' ' || COALESCE(c.apellidos,''), 'Cliente General') AS cliente
             FROM ventas v
             LEFT JOIN clientes c ON c.id = v.cliente_id
-            WHERE v.created_at BETWEEN :ini AND :fin $where
+            WHERE {$f['condV']} $where
             ORDER BY v.created_at DESC
             LIMIT 200
         ");

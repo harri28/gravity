@@ -205,12 +205,23 @@ include '../../includes/header.php';
 .dm-body { overflow: auto; }
 </style>
 
-<?php $esAdmin = isAdmin(); ?>
+<?php
+$esAdmin = isAdmin();
+// ¿El usuario tiene una caja abierta? (para arrancar el dashboard en el período "Turno")
+try {
+    $__cj = getDB()->prepare("SELECT 1 FROM cajas WHERE estado = 'abierta' AND usuario_id = :u LIMIT 1");
+    $__cj->execute([':u' => (int) sesionId()]);
+    $tieneCajaAbierta = (bool) $__cj->fetchColumn();
+} catch (Exception $e) { $tieneCajaAbierta = false; }
+?>
 <div class="dash-wrap">
 
     <!-- Filtro global de periodo -->
     <div class="per-bar">
         <span class="per-lbl"><i class="fas fa-calendar-alt"></i> Período</span>
+        <?php if ($tieneCajaAbierta): ?>
+        <button class="per-btn" data-per="turno"   onclick="setPeriodo('turno')" title="Ventas desde que aperturaste tu caja (no se reinicia a medianoche)"><i class="fas fa-cash-register" style="font-size:.8em"></i> Turno</button>
+        <?php endif; ?>
         <button class="per-btn" data-per="hoy"     onclick="setPeriodo('hoy')">Hoy</button>
         <button class="per-btn" data-per="semana"  onclick="setPeriodo('semana')">Esta semana</button>
         <button class="per-btn" data-per="mes"     onclick="setPeriodo('mes')">Este mes</button>
@@ -249,8 +260,8 @@ include '../../includes/header.php';
         <div class="col-12 col-lg-8">
             <div class="d-card">
                 <div class="d-card-head">
-                    <h3><i class="fas fa-chart-line" style="color:var(--primary)"></i> Ventas del período</h3>
-                    <span style="font-size:.72rem;color:var(--text-light)">Clic en una barra para ver las ventas del día</span>
+                    <h3><i class="fas fa-chart-line" style="color:var(--primary)"></i> <span id="chart-titulo">Ventas del período</span></h3>
+                    <span id="chart-sub" style="font-size:.72rem;color:var(--text-light)">Clic en una barra para ver las ventas del día</span>
                 </div>
                 <div class="d-card-body">
                     <div class="chart-wrap"><canvas id="chart-ventas"></canvas></div>
@@ -393,6 +404,7 @@ const API      = '../../modules/dashboard/api.php';
 const ES_ADMIN = <?= $esAdmin ? 'true' : 'false' ?>;
 const EMPRESA  = <?= json_encode(sesionTenantNombre(), JSON_UNESCAPED_UNICODE) ?>;
 const SUCURSAL = <?= json_encode(sesionSucursal(), JSON_UNESCAPED_UNICODE) ?>;
+const CAJA_ABIERTA = <?= $tieneCajaAbierta ? 'true' : 'false' ?>;
 const AUTO_REFRESH_MS = 120000;
 const alertasStore = { card: [], modal: [] };   // datos por scope (tarjeta / modal)
 let chartVentas = null;
@@ -422,8 +434,8 @@ const COMP_LABEL   = { ticket:'Ticket', boleta:'Boleta', factura:'Factura' };
 const PAGO_ICONS   = { efectivo:'💵', yape:'📱', plin:'📱', tarjeta:'💳', transferencia:'🏦' };
 
 // ---- Estado del filtro (se recuerda en el navegador) ----
-const PERIODOS = ['hoy','semana','mes','mes_ant','rango'];
-const filtro = { periodo:'hoy', desde:'', hasta:'', topMetrica:'unidades' };
+const PERIODOS = ['turno','hoy','semana','mes','mes_ant','rango'];
+const filtro = { periodo: CAJA_ABIERTA ? 'turno' : 'hoy', desde:'', hasta:'', topMetrica:'unidades' };
 
 function guardarFiltro() { try { localStorage.setItem('dash_filtro', JSON.stringify(filtro)); } catch (e) {} }
 function cargarFiltro() {
@@ -437,6 +449,9 @@ function cargarFiltro() {
         }
     } catch (e) {}
     if (filtro.periodo === 'rango' && !(filtro.desde && filtro.hasta)) filtro.periodo = 'hoy';
+    // Al cargar: si hay caja abierta, arranca en el turno; si no, nunca dejes "turno" colgado.
+    if (CAJA_ABIERTA) filtro.periodo = 'turno';
+    else if (filtro.periodo === 'turno') filtro.periodo = 'hoy';
 }
 
 function qsPeriodo(extra) {
@@ -449,6 +464,7 @@ function qsPeriodo(extra) {
 const fmtCorta = (iso) => { const p = iso.split('-'); return p[2] + '/' + p[1]; };
 function etiquetaPeriodo() {
     switch (filtro.periodo) {
+        case 'turno':   return 'Turno actual' + (cajaAperturaTxt ? ' · desde ' + cajaAperturaTxt : '');
         case 'hoy':     return 'Hoy · ' + new Date().toLocaleDateString('es-PE', {weekday:'long', day:'numeric', month:'long'});
         case 'semana':  return 'Esta semana';
         case 'mes':     return 'Este mes';
@@ -456,7 +472,8 @@ function etiquetaPeriodo() {
         default:        return fmtCorta(filtro.desde) + ' al ' + fmtCorta(filtro.hasta);
     }
 }
-const etiquetaCorta = () => ({hoy:'Hoy', semana:'Semana', mes:'Mes', mes_ant:'Mes anterior'}[filtro.periodo] || (fmtCorta(filtro.desde) + ' al ' + fmtCorta(filtro.hasta)));
+const etiquetaCorta = () => ({turno:'Turno', hoy:'Hoy', semana:'Semana', mes:'Mes', mes_ant:'Mes anterior'}[filtro.periodo] || (fmtCorta(filtro.desde) + ' al ' + fmtCorta(filtro.hasta)));
+let cajaAperturaTxt = '';   // hora de apertura del turno (la setea loadKpis)
 
 function pintarFiltro() {
     document.querySelectorAll('.per-btn').forEach(b => b.classList.toggle('active', b.dataset.per === filtro.periodo));
@@ -491,14 +508,15 @@ function setTopMetrica(m) {
 // ---- Comparativo vs periodo anterior ----
 function cmpHtml(act, ant, opts) {
     opts = opts || {};
+    const lbl = opts.label || 'vs. anterior';
     act = parseFloat(act || 0); ant = parseFloat(ant || 0);
     if (ant === 0 && act === 0) return '<div class="kpi-cmp flat">— <small>sin movimiento</small></div>';
-    if (ant === 0) return '<div class="kpi-cmp flat">nuevo <small>vs. anterior</small></div>';
+    if (ant === 0) return `<div class="kpi-cmp flat">nuevo <small>${lbl}</small></div>`;
     const pct = (act - ant) / Math.abs(ant) * 100;
     if (Math.abs(pct) < 0.05) return '<div class="kpi-cmp flat">= <small>igual que antes</small></div>';
     const sube = pct > 0;
     const cls  = opts.neutral ? 'flat' : ((sube !== !!opts.inverso) ? 'up' : 'down');
-    return `<div class="kpi-cmp ${cls}"><i class="fas fa-arrow-${sube ? 'up' : 'down'}"></i> ${Math.abs(pct).toFixed(1)}% <small>vs. anterior</small></div>`;
+    return `<div class="kpi-cmp ${cls}"><i class="fas fa-arrow-${sube ? 'up' : 'down'}"></i> ${Math.abs(pct).toFixed(1)}% <small>${lbl}</small></div>`;
 }
 
 // ---- KPIs (periodo + inventario) ----
@@ -518,17 +536,28 @@ async function loadKpis() {
     if (seq !== _seq.kpis) return;
     const a = k.actual, p = k.anterior, inv = _inv;
 
+    // Comparativo: en "turno" compara vs el turno cerrado anterior (y se oculta si no hay).
+    const esTurno = k.modo === 'turno';
+    const hayAnt  = k.tiene_anterior;
+    const cmpLbl  = esTurno ? 'vs. turno anterior' : 'vs. anterior';
+    const cmpP    = (av, bv, extra) => hayAnt ? cmpHtml(av, bv, Object.assign({ label: cmpLbl }, extra || {})) : '';
+    // Hora de apertura para la etiqueta del período
+    if (esTurno && k.caja && k.caja.apertura_at) {
+        cajaAperturaTxt = new Date(k.caja.apertura_at).toLocaleString('es-PE', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+    } else { cajaAperturaTxt = ''; }
+    document.getElementById('per-titulo').textContent = etiquetaPeriodo();
+
     const cards = [
-        { label:'Ingresos', value:fmt(a.ingresos), sub:a.anuladas + ' venta(s) anulada(s)', cmp:cmpHtml(a.ingresos, p.ingresos),
+        { label:'Ingresos', value:fmt(a.ingresos), sub:a.anuladas + ' venta(s) anulada(s)', cmp:cmpP(a.ingresos, p.ingresos),
           icon:'fas fa-coins', iconBg:'var(--primary-light)', iconColor:'var(--primary)', accent:'var(--primary)' },
-        { label:'Ventas realizadas', value:fmtN(a.total_ventas), sub:'Ticket promedio ' + fmt(a.ticket_promedio), cmp:cmpHtml(a.total_ventas, p.total_ventas),
+        { label:'Ventas realizadas', value:fmtN(a.total_ventas), sub:'Ticket promedio ' + fmt(a.ticket_promedio), cmp:cmpP(a.total_ventas, p.total_ventas),
           icon:'fas fa-receipt', iconBg:'var(--success-light)', iconColor:'var(--success)', accent:'var(--success)' },
     ];
     if (ES_ADMIN) {
         cards.push(
-            { label:'Ganancia bruta', value:fmt(a.ganancia), sub:'Costo estimado (precio de compra actual)', cmp:cmpHtml(a.ganancia, p.ganancia),
+            { label:'Ganancia bruta', value:fmt(a.ganancia), sub:'Costo estimado (precio de compra actual)', cmp:cmpP(a.ganancia, p.ganancia),
               icon:'fas fa-chart-line', iconBg:'#ecfdf5', iconColor:'#059669', accent:'#059669' },
-            { label:'Compras', value:fmt(a.compras), sub:a.compras_n + ' orden(es) de compra', cmp:cmpHtml(a.compras, p.compras, {neutral:true}),
+            { label:'Compras', value:fmt(a.compras), sub:a.compras_n + ' orden(es) de compra', cmp:cmpP(a.compras, p.compras, {neutral:true}),
               icon:'fas fa-truck-loading', iconBg:'var(--warning-light)', iconColor:'var(--warning)', accent:'var(--warning)' },
             { label:'Valor de Inventario', value:fmt(inv.valor_inventario), sub:inv.total_activos + ' productos activos', cmp:'',
               icon:'fas fa-boxes', iconBg:'var(--info-light)', iconColor:'var(--info)', accent:'var(--info)' }
@@ -593,7 +622,11 @@ async function loadChart() {
     if (seq !== _seq.chart) return;
     serieActual = data;
 
-    const labels   = data.map(d => fmtCorta(d.fecha));
+    const esTurno = filtro.periodo === 'turno';
+    document.getElementById('chart-titulo').textContent = esTurno ? 'Ventas por hora del turno' : 'Ventas del período';
+    document.getElementById('chart-sub').textContent    = esTurno ? 'Desde la apertura de tu caja hasta ahora' : 'Clic en una barra para ver las ventas del día';
+
+    const labels   = data.map(d => esTurno ? d.hora_label : fmtCorta(d.fecha));
     const ingresos = data.map(d => parseFloat(d.ingresos));
     const ventas   = data.map(d => parseInt(d.total_ventas));
     const ganancia = data.map(d => parseFloat(d.ganancia || 0));
@@ -626,11 +659,11 @@ async function loadChart() {
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
             onClick: (evt, els) => {
-                if (!els.length) return;
+                if (!els.length || filtro.periodo === 'turno') return;   // en turno (por hora) no hay drill
                 const d = serieActual[els[0].index];
                 if (d) abrirDetalle({ periodo:'rango', desde:d.fecha, hasta:d.fecha }, 'Ventas del ' + fmtCorta(d.fecha));
             },
-            onHover: (evt, els) => { evt.native.target.style.cursor = els.length ? 'pointer' : 'default'; },
+            onHover: (evt, els) => { evt.native.target.style.cursor = (els.length && filtro.periodo !== 'turno') ? 'pointer' : 'default'; },
             plugins: {
                 legend: { position: 'top', labels: { font: { size: 11 }, padding: 12 } },
                 tooltip: { callbacks: { label: c => c.dataset.yAxisID === 'y2' ? ' ' + c.parsed.y + ' ventas' : ' ' + c.dataset.label.split(' (')[0] + ': ' + fmt(c.parsed.y) } }
@@ -843,8 +876,6 @@ function alertasRenderImagen(items) {
 
     // Fondo
     ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
-    // Barra superior
-    ctx.fillStyle = '#ef4444'; ctx.fillRect(0, 0, W, 8);
 
     // Cabecera
     ctx.textBaseline = 'alphabetic';
