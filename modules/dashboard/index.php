@@ -73,6 +73,9 @@ include '../../includes/header.php';
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow);
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100%;            /* llena la columna -> tarjetas de igual altura por fila */
 }
 .d-card-head {
     padding: 16px 20px;
@@ -80,7 +83,19 @@ include '../../includes/header.php';
     display: flex; align-items: center; justify-content: space-between;
 }
 .d-card-head h3 { font-size: .92rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-.d-card-body    { padding: 20px; }
+.d-card-body    { padding: 20px; flex: 1 1 auto; min-height: 0; }
+/* Tarjetas "cortas": centran su contenido en el alto igualado (Opcion A) */
+#metodo-body, #caja-body { display: flex; flex-direction: column; justify-content: center; }
+/* Alertas: cuerpo en columna para que el pie de acciones quede pegado abajo */
+#alerta-body { display: flex; flex-direction: column; }
+/* Botones de accion de las tarjetas */
+.btn-wa { background:#25d366; color:#fff; border:none; border-radius:8px; padding:7px 12px;
+          font-size:.78rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+.btn-wa:hover { filter:brightness(.95); }
+.btn-wa:disabled { opacity:.5; cursor:not-allowed; }
+.btn-mini { background:var(--surface-2); border:1px solid var(--border); border-radius:8px;
+            padding:7px 9px; cursor:pointer; color:var(--text-muted); font-size:.78rem; }
+.btn-mini:hover { color:var(--text); }
 
 /* ---- Table ---- */
 .dash-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
@@ -361,7 +376,10 @@ include '../../includes/header.php';
 <script>
 const API      = '../../modules/dashboard/api.php';
 const ES_ADMIN = <?= $esAdmin ? 'true' : 'false' ?>;
+const EMPRESA  = <?= json_encode(sesionTenantNombre(), JSON_UNESCAPED_UNICODE) ?>;
+const SUCURSAL = <?= json_encode(sesionSucursal(), JSON_UNESCAPED_UNICODE) ?>;
 const AUTO_REFRESH_MS = 120000;
+let alertasData = [];
 let chartVentas = null;
 let serieActual = [];
 
@@ -369,6 +387,19 @@ let serieActual = [];
 const fmt  = (n) => 'S/ ' + parseFloat(n).toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
 const fmtN = (n) => parseFloat(n).toLocaleString('es-PE');
 const esc  = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// ---- Toast minimo (el dashboard no traia uno propio) ----
+function showToast(msg, tipo) {
+    const colores = { success:'#16a34a', error:'#dc2626', info:'#2563eb', warning:'#d97706' };
+    const el = document.createElement('div');
+    el.textContent = msg;
+    el.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;'
+        + 'background:' + (colores[tipo] || '#374151') + ';color:#fff;padding:10px 18px;border-radius:10px;'
+        + 'font-size:.85rem;box-shadow:0 6px 24px rgba(0,0,0,.2);max-width:90vw;text-align:center;opacity:0;transition:opacity .2s';
+    document.body.appendChild(el);
+    requestAnimationFrame(() => { el.style.opacity = '1'; });
+    setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 250); }, 3000);
+}
 
 const METODO_LABEL = { efectivo:'Efectivo', yape:'Yape', plin:'Plin', tarjeta:'Visa/Mastercard', transferencia:'Transferencia', credito:'Crédito' };
 const METODO_COLOR = { efectivo:'var(--success)', yape:'#8b5cf6', plin:'#06b6d4', tarjeta:'var(--primary)', transferencia:'var(--warning)', credito:'var(--danger)' };
@@ -682,21 +713,185 @@ async function loadAlertas() {
 
     cnt.style.display = 'inline-flex';
     cnt.textContent   = data.length + ' alerta' + (data.length > 1 ? 's' : '');
+    alertasData = data;
 
-    body.innerHTML = `<div style="max-height:320px;overflow-y:auto"><table class="dash-table">
-        <thead><tr><th>Producto</th><th style="text-align:right">Stock</th><th style="text-align:right">Mín</th></tr></thead>
-        <tbody>${data.map(p => {
+    body.innerHTML = `<div style="display:flex;flex-direction:column;flex:1 1 auto;min-height:0">
+        <div style="flex:1 1 auto;min-height:0;overflow-y:auto">
+        <table class="dash-table">
+        <thead><tr>
+            <th style="width:30px;text-align:center"><input type="checkbox" id="alerta-all" checked onclick="alertasToggleAll(this)"></th>
+            <th>Producto</th><th style="text-align:right">Stock</th><th style="text-align:right">Mín</th>
+        </tr></thead>
+        <tbody>${data.map((p, i) => {
             const cls = p.alerta === 'agotado' ? 'badge-danger' : 'badge-warning';
-            return `<tr class="clickable" onclick="location.href='../inventario/index.php'" title="Ver en inventario">
+            return `<tr style="cursor:pointer" onclick="alertasRowToggle(event, ${i})">
+                <td style="text-align:center"><input type="checkbox" class="alerta-chk" data-i="${i}" checked onclick="event.stopPropagation();alertasUpdateCount()"></td>
                 <td>
-                    <div style="font-weight:500;font-size:.82rem">${esc(p.nombre)}</div>
+                    <div style="font-weight:500;font-size:.82rem">${esc(p.nombre)}
+                        <a href="../inventario/index.php" onclick="event.stopPropagation()" title="Ver en inventario" style="color:var(--text-light);margin-left:4px;font-size:.68rem"><i class="fas fa-arrow-up-right-from-square"></i></a>
+                    </div>
                     <div style="font-size:.7rem;color:var(--text-light)">${esc(p.categoria || '—')}</div>
                 </td>
                 <td style="text-align:right"><span class="kpi-badge ${cls}">${p.stock}</span></td>
                 <td style="text-align:right;color:var(--text-muted)">${p.stock_minimo}</td>
             </tr>`;
         }).join('')}</tbody>
-    </table></div>`;
+        </table>
+        </div>
+        <div style="padding:10px 16px;border-top:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <span style="font-size:.74rem;color:var(--text-muted)"><span id="alerta-sel">${data.length}</span> seleccionado(s)</span>
+            <div style="display:flex;gap:6px">
+                <button class="btn-mini" title="Número de WhatsApp del proveedor (por defecto)" onclick="alertasConfigNumero()"><i class="fas fa-gear"></i></button>
+                <button class="btn-wa" id="alerta-wa-btn" onclick="alertasEnviarImagen()"><i class="fab fa-whatsapp"></i> Enviar imagen</button>
+            </div>
+        </div>
+    </div>`;
+}
+
+// ---- Alertas: seleccion ----
+function alertasToggleAll(src) {
+    document.querySelectorAll('.alerta-chk').forEach(c => { c.checked = src.checked; });
+    alertasUpdateCount();
+}
+function alertasRowToggle(ev, i) {
+    const c = document.querySelector('.alerta-chk[data-i="' + i + '"]');
+    if (c) { c.checked = !c.checked; alertasUpdateCount(); }
+}
+function alertasUpdateCount() {
+    const chks = Array.from(document.querySelectorAll('.alerta-chk'));
+    const sel  = chks.filter(c => c.checked).length;
+    const lbl  = document.getElementById('alerta-sel');
+    if (lbl) lbl.textContent = sel;
+    const all = document.getElementById('alerta-all');
+    if (all) all.checked = sel === chks.length && chks.length > 0;
+    const btn = document.getElementById('alerta-wa-btn');
+    if (btn) btn.disabled = sel === 0;
+}
+function alertasSeleccionados() {
+    return Array.from(document.querySelectorAll('.alerta-chk'))
+        .filter(c => c.checked)
+        .map(c => alertasData[parseInt(c.dataset.i, 10)])
+        .filter(Boolean);
+}
+
+// ---- Alertas: numero de proveedor por defecto (localStorage) ----
+function alertasGetNumero() { try { return localStorage.getItem('gravity_wa_proveedor') || ''; } catch (e) { return ''; } }
+function alertasConfigNumero() {
+    const actual = alertasGetNumero();
+    const n = prompt('Número de WhatsApp del proveedor por defecto (con código de país, solo dígitos).\nEj: 51987654321', actual);
+    if (n === null) return;
+    const limpio = n.replace(/\D/g, '');
+    try {
+        if (limpio) { localStorage.setItem('gravity_wa_proveedor', limpio); showToast('Número guardado: ' + limpio, 'success'); }
+        else { localStorage.removeItem('gravity_wa_proveedor'); showToast('Número por defecto borrado', 'info'); }
+    } catch (e) { showToast('No se pudo guardar el número', 'error'); }
+}
+
+// ---- Alertas: generar imagen (Canvas) y compartir por WhatsApp ----
+function alertasRenderImagen(items) {
+    const dpr   = 2;                 // nitidez
+    const W     = 720;
+    const padX  = 40;
+    const rowH  = 54;
+    const headH = 150;
+    const footH = 40;
+    const H     = headH + items.length * rowH + footH;
+
+    const cv = document.createElement('canvas');
+    cv.width = W * dpr; cv.height = H * dpr;
+    const ctx = cv.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    // Fondo
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+    // Barra superior
+    ctx.fillStyle = '#ef4444'; ctx.fillRect(0, 0, W, 8);
+
+    // Cabecera
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#111827';
+    ctx.font = '700 26px Arial';
+    ctx.fillText('Alerta de stock', padX, 54);
+    ctx.fillStyle = '#374151';
+    ctx.font = '600 16px Arial';
+    ctx.fillText((EMPRESA || '') + (SUCURSAL ? ' — ' + SUCURSAL : ''), padX, 82);
+    const ahora = new Date();
+    const fstr  = ahora.toLocaleDateString('es-PE') + ' ' + ahora.toLocaleTimeString('es-PE', {hour:'2-digit', minute:'2-digit'});
+    ctx.fillStyle = '#6b7280';
+    ctx.font = '400 13px Arial';
+    ctx.fillText('Generado: ' + fstr + '  ·  ' + items.length + ' producto(s)', padX, 104);
+
+    // Encabezado de tabla
+    let y = headH - 16;
+    ctx.fillStyle = '#9ca3af';
+    ctx.font = '600 12px Arial';
+    ctx.fillText('PRODUCTO', padX, y);
+    ctx.textAlign = 'right';
+    ctx.fillText('STOCK', W - padX - 90, y);
+    ctx.fillText('MÍN', W - padX, y);
+    ctx.textAlign = 'left';
+    ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(padX, headH - 6); ctx.lineTo(W - padX, headH - 6); ctx.stroke();
+
+    // Filas
+    items.forEach((p, idx) => {
+        const top = headH + idx * rowH;
+        const midY = top + rowH / 2;
+        if (idx % 2 === 1) { ctx.fillStyle = '#f9fafb'; ctx.fillRect(padX - 10, top, W - 2 * padX + 20, rowH); }
+        // Nombre
+        ctx.fillStyle = '#111827'; ctx.font = '600 16px Arial';
+        let nombre = p.nombre || '';
+        const maxW = W - 2 * padX - 170;
+        while (ctx.measureText(nombre).width > maxW && nombre.length > 4) nombre = nombre.slice(0, -2);
+        if (nombre !== (p.nombre || '')) nombre += '…';
+        ctx.fillText(nombre, padX, midY - 2);
+        if (p.categoria) { ctx.fillStyle = '#9ca3af'; ctx.font = '400 12px Arial'; ctx.fillText(p.categoria, padX, midY + 16); }
+        // Badge stock
+        const agotado = p.alerta === 'agotado';
+        ctx.textAlign = 'right';
+        ctx.fillStyle = agotado ? '#dc2626' : '#d97706';
+        ctx.font = '700 17px Arial';
+        ctx.fillText(agotado ? '0 (agotado)' : String(p.stock), W - padX - 90, midY + 4);
+        ctx.fillStyle = '#6b7280'; ctx.font = '400 15px Arial';
+        ctx.fillText(String(p.stock_minimo), W - padX, midY + 4);
+        ctx.textAlign = 'left';
+    });
+
+    // Pie
+    ctx.fillStyle = '#9ca3af'; ctx.font = '400 12px Arial'; ctx.textAlign = 'center';
+    ctx.fillText('Generado por Gravity', W / 2, H - 16);
+    ctx.textAlign = 'left';
+
+    return cv;
+}
+
+function alertasEnviarImagen() {
+    const items = alertasSeleccionados();
+    if (!items.length) { showToast('Selecciona al menos un producto', 'error'); return; }
+    const cv = alertasRenderImagen(items);
+    cv.toBlob(async (blob) => {
+        if (!blob) { showToast('No se pudo generar la imagen', 'error'); return; }
+        const fecha = new Date().toISOString().slice(0, 10);
+        const file  = new File([blob], 'alerta-stock-' + fecha + '.png', { type: 'image/png' });
+        const caption = 'Alerta de stock' + (SUCURSAL ? ' — ' + SUCURSAL : '') + ' (' + items.length + ' productos)';
+
+        // Celular: compartir la imagen real por el menu nativo (WhatsApp incluido)
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try { await navigator.share({ files: [file], title: 'Alerta de stock', text: caption }); return; }
+            catch (e) { if (e && e.name === 'AbortError') return; /* si falla, cae al fallback */ }
+        }
+
+        // PC: descarga el PNG y abre WhatsApp al numero por defecto para adjuntarlo
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+
+        let numero = alertasGetNumero();
+        const waBase = numero ? 'https://wa.me/' + numero : 'https://wa.me/';
+        window.open(waBase + '?text=' + encodeURIComponent(caption + '\n(imagen descargada: adjúntala en el chat)'), '_blank');
+        showToast('Imagen descargada. Adjúntala en WhatsApp.', 'info');
+    }, 'image/png');
 }
 
 // ---- Productos por vencer (admin/gerente) ----
