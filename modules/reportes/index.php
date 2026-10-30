@@ -664,6 +664,33 @@ include '../../includes/header.php';
     </div>
 </div>
 
+<!-- ===================== MODAL: Ventas de un vendedor ===================== -->
+<div class="modal-overlay" id="modal-vt-ventas">
+    <div class="modal" style="max-width:720px">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="fas fa-user-tag" style="color:var(--primary);margin-right:8px"></i>
+                <span id="vtv-titulo">Ventas del vendedor</span>
+            </h3>
+            <button class="modal-close" onclick="closeModal('modal-vt-ventas')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div id="vtv-info" style="font-size:.82rem;color:var(--text-muted);margin-bottom:10px">—</div>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr>
+                        <th>Fecha</th><th>Comprobante</th><th>Cliente</th>
+                        <th class="text-right">Total</th><th>Estado</th>
+                    </tr></thead>
+                    <tbody id="vtv-tabla-body">
+                        <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="app-toast-container" id="toast-container"></div>
 
 <script>
@@ -879,6 +906,7 @@ function vtParams(extra = {}) {
     }).toString();
 }
 
+let vtRows = [];
 function vtBuscar() {
     const agrupar = document.getElementById('vt-agrupar').value;
     const labels = { vendedor: 'Vendedor', dia: 'Día', comprobante: 'Tipo de comprobante' };
@@ -906,11 +934,13 @@ function vtBuscar() {
                     '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-light)">Sin resultados</td></tr>';
                 return;
             }
-            document.getElementById('vt-tabla-body').innerHTML = rows.map(r => {
+            vtRows = rows;
+            document.getElementById('vt-tabla-body').innerHTML = rows.map((r, i) => {
                 const vsProm = parseFloat(r.pct_vs_promedio);
                 const vsPromCls = vsProm >= 100 ? 'color:var(--success);font-weight:600' : 'color:var(--danger);font-weight:600';
-                return `<tr>
-                <td style="text-transform:capitalize">${esc(r.etiqueta)}</td>
+                const clickable = agrupar === 'vendedor';
+                return `<tr ${clickable ? `style="cursor:pointer" onclick="vtVerVentas(${i})" title="Ver ventas de este vendedor"` : ''}>
+                <td style="text-transform:capitalize">${esc(r.etiqueta)}${clickable ? ' <i class="fas fa-list" style="color:var(--primary);font-size:.72rem"></i>' : ''}</td>
                 <td class="text-right">${r.total_ventas}</td>
                 <td class="text-right"><strong>${money(r.total_ingresos)}</strong></td>
                 <td class="text-right">${money(r.total_igv)}</td>
@@ -925,6 +955,50 @@ function vtBuscar() {
 }
 
 function vtExportar() { repDownload(API + '?action=ventas_exportar&' + vtParams()); }
+
+// Drill del reporte de Ventas por vendedor: ventas individuales del vendedor
+// en el mismo rango de fechas del filtro.
+function vtVerVentas(i) {
+    const row = vtRows[i];
+    if (!row) return;
+    const vendedor = row.etiqueta;
+    const desde = document.getElementById('vt-desde').value;
+    const hasta = document.getElementById('vt-hasta').value;
+    document.getElementById('vtv-titulo').textContent = 'Ventas de ' + vendedor;
+    document.getElementById('vtv-info').textContent = '—';
+    document.getElementById('vtv-tabla-body').innerHTML =
+        '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></td></tr>';
+    openModal('modal-vt-ventas');
+    fetch(API + '?action=ventas_por_vendedor&vendedor=' + encodeURIComponent(vendedor) + '&desde=' + encodeURIComponent(desde) + '&hasta=' + encodeURIComponent(hasta))
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) { showToast(data.message, 'error'); closeModal('modal-vt-ventas'); return; }
+            const ventas = Array.isArray(data) ? data : [];
+            const completadas = ventas.filter(v => v.estado === 'completada');
+            const totalComp = completadas.reduce((a, v) => a + parseFloat(v.total || 0), 0);
+            document.getElementById('vtv-info').innerHTML =
+                `${ventas.length} venta(s) · ${completadas.length} vigente(s) · Total vigente ${money(totalComp)}`;
+            if (!ventas.length) {
+                document.getElementById('vtv-tabla-body').innerHTML =
+                    '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-light)">Sin ventas en el periodo</td></tr>';
+                return;
+            }
+            document.getElementById('vtv-tabla-body').innerHTML = ventas.map(v => {
+                const anulada = v.estado !== 'completada';
+                const comp = v.comprobante_numero || v.numero_venta;
+                const tipo = v.comprobante_numero ? (v.tipo_comprobante || '').toUpperCase() : 'NOTA DE VENTA';
+                const dt = new Date(v.created_at);
+                return `<tr${anulada ? ' style="opacity:.55"' : ''}>
+                    <td style="font-size:.82rem">${dt.toLocaleDateString('es-PE')} ${dt.toLocaleTimeString('es-PE', {hour:'2-digit', minute:'2-digit'})}</td>
+                    <td><strong>${esc(comp)}</strong><div style="font-size:.72rem;color:var(--text-muted)">${esc(tipo)}</div></td>
+                    <td style="font-size:.85rem">${esc(v.cliente)}</td>
+                    <td class="text-right"><strong>${money(v.total)}</strong></td>
+                    <td><span class="badge ${anulada ? 'badge-danger' : 'badge-success'}">${anulada ? 'Anulada' : 'Vigente'}</span></td>
+                </tr>`;
+            }).join('');
+        })
+        .catch(() => { showToast('Error al cargar las ventas', 'error'); closeModal('modal-vt-ventas'); });
+}
 
 // ================================================================
 // INVENTARIO (Valorización)

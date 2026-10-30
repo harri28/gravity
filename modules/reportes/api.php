@@ -493,6 +493,34 @@ switch ($action) {
         }
         break;
 
+    // Drill del reporte de Ventas agrupado por vendedor: ventas individuales
+    // de un vendedor dentro del mismo rango de fechas del filtro.
+    case 'ventas_por_vendedor':
+        [$desde, $hastaDt] = reportesRangoFechas();
+        $vendedor = trim((string) ($_GET['vendedor'] ?? ''));
+        if ($vendedor === '') {
+            jsonResponse(['error' => true, 'message' => 'Vendedor no indicado'], 422);
+        }
+        try {
+            $stmt = $db->prepare("
+                SELECT v.numero_venta, v.created_at, v.total, v.tipo_comprobante, v.estado,
+                       COALESCE(NULLIF(TRIM(c.nombres || ' ' || COALESCE(c.apellidos,'')),''),
+                                c.razon_social, c.nombre_completo, 'Cliente General') AS cliente,
+                       COALESCE(ce.numero_completo, '') AS comprobante_numero
+                FROM ventas v
+                LEFT JOIN clientes c ON c.id = v.cliente_id
+                LEFT JOIN comprobantes_electronicos ce ON ce.venta_id = v.id AND ce.tipo IN ('boleta','factura')
+                WHERE v.created_at BETWEEN :desde AND :hasta
+                  AND COALESCE(v.vendedor, 'Sin asignar') = :vend
+                ORDER BY v.created_at DESC
+            ");
+            $stmt->execute([':desde' => $desde, ':hasta' => $hastaDt, ':vend' => $vendedor]);
+            echo json_encode($stmt->fetchAll());
+        } catch (Exception $e) {
+            jsonResponse(['error' => true, 'message' => $e->getMessage()], 500);
+        }
+        break;
+
     case 'ventas_exportar':
         [$desde, $hastaDt] = reportesRangoFechas();
         $agrupar = trim((string) ($_GET['agrupar'] ?? 'vendedor'));
