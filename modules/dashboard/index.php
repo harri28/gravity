@@ -305,7 +305,9 @@ include '../../includes/header.php';
             <div class="d-card">
                 <div class="d-card-head">
                     <h3><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i> Alertas de Stock</h3>
-                    <span id="alerta-count" class="kpi-badge badge-danger" style="display:none"></span>
+                    <button id="alerta-expand" class="btn-mini" style="display:none;align-items:center;gap:6px" onclick="abrirModalAlertas()" title="Ver todos los productos con stock bajo">
+                        <i class="fas fa-up-right-and-down-left-from-center"></i> Ver todas (<span id="alerta-count-n">0</span>)
+                    </button>
                 </div>
                 <div class="d-card-body" id="alerta-body" style="padding:0">
                     <div class="skel" style="height:200px;margin:20px"></div>
@@ -370,6 +372,19 @@ include '../../includes/header.php';
     </div>
 </div>
 
+<!-- Modal: todos los productos con stock bajo -->
+<div class="modal-overlay" id="modal-alertas" onclick="if(event.target===this)cerrarModalAlertas()">
+    <div class="modal modal-lg">
+        <div class="modal-header">
+            <h3 class="modal-title"><i class="fas fa-exclamation-triangle" style="color:var(--danger);margin-right:8px"></i>Productos con stock bajo</h3>
+            <button class="modal-close" onclick="cerrarModalAlertas()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body" id="modal-alertas-body" style="display:flex;flex-direction:column;max-height:72vh;padding:0">
+            <div style="text-align:center;padding:40px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></div>
+        </div>
+    </div>
+</div>
+
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 
@@ -379,7 +394,7 @@ const ES_ADMIN = <?= $esAdmin ? 'true' : 'false' ?>;
 const EMPRESA  = <?= json_encode(sesionTenantNombre(), JSON_UNESCAPED_UNICODE) ?>;
 const SUCURSAL = <?= json_encode(sesionSucursal(), JSON_UNESCAPED_UNICODE) ?>;
 const AUTO_REFRESH_MS = 120000;
-let alertasData = [];
+const alertasStore = { card: [], modal: [] };   // datos por scope (tarjeta / modal)
 let chartVentas = null;
 let serieActual = [];
 
@@ -702,30 +717,54 @@ async function loadAlertas() {
     const res  = await fetch(API + '?action=stock_alertas');
     const data = await res.json();
     const body = document.getElementById('alerta-body');
-    const cnt  = document.getElementById('alerta-count');
+    const btnX = document.getElementById('alerta-expand');
 
     if (!data.length) {
-        cnt.style.display = 'none';
+        if (btnX) btnX.style.display = 'none';
         body.innerHTML = `<p style="color:var(--success);font-size:.83rem;text-align:center;padding:30px">
             <i class="fas fa-check-circle" style="display:block;font-size:1.6rem;margin-bottom:8px"></i>Stock en orden</p>`;
         return;
     }
 
-    cnt.style.display = 'inline-flex';
-    cnt.textContent   = data.length + ' alerta' + (data.length > 1 ? 's' : '');
-    alertasData = data;
+    if (btnX) { btnX.style.display = 'inline-flex'; document.getElementById('alerta-count-n').textContent = data.length; }
+    alertasStore.card = data;
+    body.innerHTML = alertasBuildHTML('card', data);
+}
 
-    body.innerHTML = `<div style="display:flex;flex-direction:column;flex:1 1 auto;min-height:0">
+// ---- Modal "Ver todas": lista completa de productos con stock bajo ----
+async function abrirModalAlertas() {
+    const ov   = document.getElementById('modal-alertas');
+    const body = document.getElementById('modal-alertas-body');
+    body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></div>';
+    ov.classList.add('open');
+    try {
+        const res  = await fetch(API + '?action=stock_alertas&full=1');
+        const data = await res.json();
+        if (!data.length) {
+            body.innerHTML = '<div class="empty-state"><i class="fas fa-check-circle" style="color:var(--success)"></i>Stock en orden</div>';
+            return;
+        }
+        alertasStore.modal = data;
+        body.innerHTML = alertasBuildHTML('modal', data);
+    } catch (e) {
+        body.innerHTML = '<div class="empty-state">No se pudo cargar la lista</div>';
+    }
+}
+function cerrarModalAlertas() { document.getElementById('modal-alertas').classList.remove('open'); }
+
+// ---- Alertas: constructor de la lista seleccionable (reutilizado por tarjeta y modal) ----
+function alertasBuildHTML(prefix, data) {
+    return `<div style="display:flex;flex-direction:column;flex:1 1 auto;min-height:0">
         <div style="flex:1 1 auto;min-height:0;overflow-y:auto">
         <table class="dash-table">
         <thead><tr>
-            <th style="width:30px;text-align:center"><input type="checkbox" id="alerta-all" checked onclick="alertasToggleAll(this)"></th>
+            <th style="width:30px;text-align:center"><input type="checkbox" id="${prefix}-all" checked onclick="alertasToggleAll('${prefix}', this)"></th>
             <th>Producto</th><th style="text-align:right">Stock</th><th style="text-align:right">Mín</th>
         </tr></thead>
         <tbody>${data.map((p, i) => {
             const cls = p.alerta === 'agotado' ? 'badge-danger' : 'badge-warning';
-            return `<tr style="cursor:pointer" onclick="alertasRowToggle(event, ${i})">
-                <td style="text-align:center"><input type="checkbox" class="alerta-chk" data-i="${i}" checked onclick="event.stopPropagation();alertasUpdateCount()"></td>
+            return `<tr style="cursor:pointer" onclick="alertasRowToggle('${prefix}', event, ${i})">
+                <td style="text-align:center"><input type="checkbox" class="${prefix}-chk" data-i="${i}" checked onclick="event.stopPropagation();alertasUpdateCount('${prefix}')"></td>
                 <td>
                     <div style="font-weight:500;font-size:.82rem">${esc(p.nombre)}
                         <a href="../inventario/index.php" onclick="event.stopPropagation()" title="Ver en inventario" style="color:var(--text-light);margin-left:4px;font-size:.68rem"><i class="fas fa-arrow-up-right-from-square"></i></a>
@@ -739,38 +778,38 @@ async function loadAlertas() {
         </table>
         </div>
         <div style="padding:10px 16px;border-top:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;gap:8px">
-            <span style="font-size:.74rem;color:var(--text-muted)"><span id="alerta-sel">${data.length}</span> seleccionado(s)</span>
+            <span style="font-size:.74rem;color:var(--text-muted)"><span id="${prefix}-sel">${data.length}</span> seleccionado(s)</span>
             <div style="display:flex;gap:6px">
                 <button class="btn-mini" title="Número de WhatsApp del proveedor (por defecto)" onclick="alertasConfigNumero()"><i class="fas fa-gear"></i></button>
-                <button class="btn-wa" id="alerta-wa-btn" onclick="alertasEnviarImagen()"><i class="fab fa-whatsapp"></i> Enviar imagen</button>
+                <button class="btn-wa" id="${prefix}-wa-btn" onclick="alertasEnviarImagen('${prefix}')"><i class="fab fa-whatsapp"></i> Enviar imagen</button>
             </div>
         </div>
     </div>`;
 }
 
-// ---- Alertas: seleccion ----
-function alertasToggleAll(src) {
-    document.querySelectorAll('.alerta-chk').forEach(c => { c.checked = src.checked; });
-    alertasUpdateCount();
+// ---- Alertas: seleccion (por scope) ----
+function alertasToggleAll(prefix, src) {
+    document.querySelectorAll('.' + prefix + '-chk').forEach(c => { c.checked = src.checked; });
+    alertasUpdateCount(prefix);
 }
-function alertasRowToggle(ev, i) {
-    const c = document.querySelector('.alerta-chk[data-i="' + i + '"]');
-    if (c) { c.checked = !c.checked; alertasUpdateCount(); }
+function alertasRowToggle(prefix, ev, i) {
+    const c = document.querySelector('.' + prefix + '-chk[data-i="' + i + '"]');
+    if (c) { c.checked = !c.checked; alertasUpdateCount(prefix); }
 }
-function alertasUpdateCount() {
-    const chks = Array.from(document.querySelectorAll('.alerta-chk'));
+function alertasUpdateCount(prefix) {
+    const chks = Array.from(document.querySelectorAll('.' + prefix + '-chk'));
     const sel  = chks.filter(c => c.checked).length;
-    const lbl  = document.getElementById('alerta-sel');
+    const lbl  = document.getElementById(prefix + '-sel');
     if (lbl) lbl.textContent = sel;
-    const all = document.getElementById('alerta-all');
+    const all = document.getElementById(prefix + '-all');
     if (all) all.checked = sel === chks.length && chks.length > 0;
-    const btn = document.getElementById('alerta-wa-btn');
+    const btn = document.getElementById(prefix + '-wa-btn');
     if (btn) btn.disabled = sel === 0;
 }
-function alertasSeleccionados() {
-    return Array.from(document.querySelectorAll('.alerta-chk'))
+function alertasSeleccionados(prefix) {
+    return Array.from(document.querySelectorAll('.' + prefix + '-chk'))
         .filter(c => c.checked)
-        .map(c => alertasData[parseInt(c.dataset.i, 10)])
+        .map(c => alertasStore[prefix][parseInt(c.dataset.i, 10)])
         .filter(Boolean);
 }
 
@@ -865,8 +904,8 @@ function alertasRenderImagen(items) {
     return cv;
 }
 
-function alertasEnviarImagen() {
-    const items = alertasSeleccionados();
+function alertasEnviarImagen(prefix) {
+    const items = alertasSeleccionados(prefix);
     if (!items.length) { showToast('Selecciona al menos un producto', 'error'); return; }
     const cv = alertasRenderImagen(items);
     cv.toBlob(async (blob) => {

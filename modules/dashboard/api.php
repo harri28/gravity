@@ -226,6 +226,9 @@ switch ($action) {
 
     // ---- GET: Productos con stock bajo o agotado ----
     case 'stock_alertas':
+        // full=1 -> lista completa (para el modal "Ver todas"); por defecto, tope de 20 (vista compacta de la tarjeta).
+        $full  = ($_GET['full'] ?? '') === '1';
+        $limit = $full ? '' : 'LIMIT 20';
         $rows = $db->query("
             SELECT p.id, p.codigo, p.nombre, p.laboratorio,
                    p.stock, p.stock_minimo, c.nombre AS categoria,
@@ -237,7 +240,7 @@ switch ($action) {
             LEFT JOIN public.categorias c ON c.id = p.categoria_id
             WHERE p.activo = TRUE AND p.stock <= p.stock_minimo
             ORDER BY p.stock ASC, p.nombre ASC
-            LIMIT 20
+            $limit
         ")->fetchAll();
         echo json_encode($rows);
         break;
