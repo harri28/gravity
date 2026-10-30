@@ -11,6 +11,13 @@ requireApiAuth(['admin', 'gerente', 'cajero']);
 $action = $_GET['action'] ?? '';
 $db     = getDB();
 
+// En el dashboard, cualquier rol con acceso (incluido el cajero) ve las mismas
+// metricas financieras que el admin: ganancia de su turno, compras, valor de
+// inventario, top por ganancia y productos por vencer. (Decision de negocio: el
+// cajero necesita su ganancia del turno para su cuadre/contabilidad.) El resto
+// del sistema -modulo Rentabilidad, etc.- sigue restringido por rol como siempre.
+$dashVerFinanzas = true;
+
 // ---- Rango de fechas del filtro global (periodo=hoy|semana|mes|mes_ant|rango) ----
 // Devuelve el rango pedido y el "periodo anterior" de igual duracion que lo
 // precede inmediatamente (para los comparativos de las tarjetas).
@@ -318,7 +325,7 @@ switch ($action) {
 
     // ---- GET: KPIs del periodo elegido + periodo anterior (comparativo) ----
     case 'kpis':
-        $admin   = isAdmin();
+        $admin   = $dashVerFinanzas;
         $periodo = $_GET['periodo'] ?? 'hoy';
 
         // --- Turno: filtra por la caja abierta del usuario; compara vs su ultimo turno cerrado ---
@@ -376,7 +383,7 @@ switch ($action) {
             foreach ($s->fetchAll() as $row) $map[substr($row['hora'], 0, 13)] = $row;
 
             $gan = [];
-            if (isAdmin()) {
+            if ($dashVerFinanzas) {
                 $g = $db->prepare("
                     SELECT date_trunc('hour', v.created_at) AS hora,
                            COALESCE(SUM(vd.subtotal - vd.cantidad * p.precio_compra), 0) AS ganancia
@@ -403,7 +410,7 @@ switch ($action) {
                     'total_ventas' => (int) ($map[$k]['total_ventas'] ?? 0),
                     'ingresos'     => (float) ($map[$k]['ingresos'] ?? 0),
                 ];
-                if (isAdmin()) $item['ganancia'] = $gan[$k] ?? 0;
+                if ($dashVerFinanzas) $item['ganancia'] = $gan[$k] ?? 0;
                 $serie[] = $item;
                 $cur->modify('+1 hour');
                 $guard++;
@@ -427,7 +434,7 @@ switch ($action) {
         foreach ($s->fetchAll() as $row) $map[$row['fecha']] = $row;
 
         $gan = [];
-        if (isAdmin()) {
+        if ($dashVerFinanzas) {
             $g = $db->prepare("
                 SELECT DATE(v.created_at) AS fecha,
                        COALESCE(SUM(vd.subtotal - vd.cantidad * p.precio_compra), 0) AS ganancia
@@ -450,7 +457,7 @@ switch ($action) {
                 'total_ventas' => (int) ($map[$fe]['total_ventas'] ?? 0),
                 'ingresos'     => (float) ($map[$fe]['ingresos'] ?? 0),
             ];
-            if (isAdmin()) $item['ganancia'] = $gan[$fe] ?? 0;
+            if ($dashVerFinanzas) $item['ganancia'] = $gan[$fe] ?? 0;
             $serie[] = $item;
             $cur->modify('+1 day');
         }
@@ -476,7 +483,7 @@ switch ($action) {
         $f       = dashVentasFiltro($db);
         $metrica = $_GET['metrica'] ?? 'unidades';
         if (!in_array($metrica, ['unidades', 'ingresos', 'ganancia'], true)) $metrica = 'unidades';
-        if ($metrica === 'ganancia' && !isAdmin()) $metrica = 'unidades';
+        if ($metrica === 'ganancia' && !$dashVerFinanzas) $metrica = 'unidades';
         $s = $db->prepare("
             SELECT p.id, p.nombre, p.laboratorio, c.nombre AS categoria,
                    SUM(vd.cantidad) AS unidades,
@@ -493,7 +500,7 @@ switch ($action) {
         ");
         $s->execute($f['params']);
         $rows = $s->fetchAll();
-        if (!isAdmin()) foreach ($rows as &$row) unset($row['ganancia']);
+        if (!$dashVerFinanzas) foreach ($rows as &$row) unset($row['ganancia']);
         unset($row);
         echo json_encode(['metrica' => $metrica, 'items' => $rows]);
         break;
@@ -520,7 +527,7 @@ switch ($action) {
 
     // ---- GET: Productos por vencer (solo admin/gerente) ----
     case 'por_vencer':
-        requireApiAuth(['admin', 'gerente']);
+        requireApiAuth(['admin', 'gerente', 'cajero']);
         $rows = $db->query("
             SELECT p.id, p.nombre, p.laboratorio, p.stock, p.fecha_vencimiento,
                    (p.fecha_vencimiento - CURRENT_DATE) AS dias

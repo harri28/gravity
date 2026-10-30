@@ -206,7 +206,11 @@ include '../../includes/header.php';
 </style>
 
 <?php
-$esAdmin = isAdmin();
+// En el dashboard, cualquier rol con acceso (incluido el cajero) ve las mismas
+// metricas financieras que el admin (ganancia de su turno, compras, valor de
+// inventario, top por ganancia, productos por vencer). El backend aplica la misma
+// regla con su propio $dashVerFinanzas. El resto del sistema sigue por rol.
+$dashVerFinanzas = true;
 // ¿El usuario tiene una caja abierta? (para arrancar el dashboard en el período "Turno")
 try {
     $__cj = getDB()->prepare("SELECT 1 FROM cajas WHERE estado = 'abierta' AND usuario_id = :u LIMIT 1");
@@ -303,7 +307,7 @@ try {
                     <div class="seg" id="top-seg">
                         <button data-m="unidades" class="active" onclick="setTopMetrica('unidades')">Uds.</button>
                         <button data-m="ingresos" onclick="setTopMetrica('ingresos')">Ingresos</button>
-                        <?php if ($esAdmin): ?><button data-m="ganancia" onclick="setTopMetrica('ganancia')">Ganancia</button><?php endif; ?>
+                        <?php if ($dashVerFinanzas): ?><button data-m="ganancia" onclick="setTopMetrica('ganancia')">Ganancia</button><?php endif; ?>
                     </div>
                 </div>
                 <div class="d-card-body" id="top-body" style="padding:0">
@@ -327,7 +331,7 @@ try {
         </div>
     </div>
 
-    <?php if ($esAdmin): ?>
+    <?php if ($dashVerFinanzas): ?>
     <!-- Productos por vencer -->
     <div class="d-card">
         <div class="d-card-head">
@@ -401,7 +405,9 @@ try {
 
 <script>
 const API      = '../../modules/dashboard/api.php';
-const ES_ADMIN = <?= $esAdmin ? 'true' : 'false' ?>;
+// En el dashboard todos los roles con acceso ven las finanzas (ganancia, compras,
+// valor de inventario, etc.), por eso este flag es siempre true aqui.
+const ES_ADMIN = <?= $dashVerFinanzas ? 'true' : 'false' ?>;
 const EMPRESA  = <?= json_encode(sesionTenantNombre(), JSON_UNESCAPED_UNICODE) ?>;
 const SUCURSAL = <?= json_encode(sesionSucursal(), JSON_UNESCAPED_UNICODE) ?>;
 const CAJA_ABIERTA = <?= $tieneCajaAbierta ? 'true' : 'false' ?>;
