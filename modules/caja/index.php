@@ -212,7 +212,7 @@ include '../../includes/header.php';
             <div class="stat-icon yellow"><i class="fas fa-hand-holding-usd"></i></div>
             <div>
                 <div class="stat-value">S/ <?= number_format($saldo_esperado, 2) ?></div>
-                <div class="stat-label">Total esperado en caja</div>
+                <div class="stat-label">Saldo actual en caja</div>
             </div>
         </div>
     </div>
@@ -310,7 +310,7 @@ include '../../includes/header.php';
                 </div>
                 <?php endif; ?>
                 <div style="display:flex;justify-content:space-between;padding:10px 0 0;font-weight:700;font-size:1rem">
-                    <span>Total esperado</span>
+                    <span>Saldo actual</span>
                     <span style="color:var(--success)">S/ <?= number_format($saldo_esperado, 2) ?></span>
                 </div>
             </div>
@@ -352,7 +352,7 @@ include '../../includes/header.php';
                 <?php endif; ?>
                 <div style="display:flex;justify-content:space-between;padding:8px 0 0;border-top:1px solid var(--border);
                             margin-top:6px;font-weight:700">
-                    <span>Total esperado</span>
+                    <span>Saldo actual</span>
                     <span style="color:var(--success)">S/ <?= number_format($saldo_esperado, 2) ?></span>
                 </div>
             </div>

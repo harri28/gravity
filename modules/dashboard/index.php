@@ -615,7 +615,7 @@ function renderCaja(caja) {
             <div class="caja-row"><span class="label">Ventas del turno</span><span class="val">${caja.ventas_count} · ${fmt(caja.ventas_total)}</span></div>
             <hr style="border:none;border-top:1px solid var(--border-light);margin:4px 0">
             <div class="caja-row">
-                <span class="label" style="font-weight:600">Saldo esperado</span>
+                <span class="label" style="font-weight:600">Saldo actual</span>
                 <span class="val" style="color:var(--success);font-size:1.05rem">${fmt(caja.saldo_esperado)}</span>
             </div>
         </div>`;
