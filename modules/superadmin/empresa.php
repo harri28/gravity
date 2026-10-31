@@ -26,8 +26,8 @@ $_sa_tema_oscuro = getSuperadminTemaOscuro();
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#4f46e5">
     <title><?= htmlspecialchars($tenant['nombre']) ?> — Gravity</title>
+    <link rel="icon" type="image/svg+xml" href="../../assets/img/logos/favicon.svg?v=<?= @filemtime(__DIR__ . '/../../assets/img/logos/favicon.svg') ?: 1 ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -90,7 +90,7 @@ $_sa_tema_oscuro = getSuperadminTemaOscuro();
         .btn-logout:hover { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
 
         /* Main */
-        .main { padding: 28px 32px; max-width: 1300px; margin: 0 auto; }
+        .main { padding: 28px 32px; max-width: 1500px; width: 100%; margin: 0 auto; }
 
         /* Hero header */
         .hero {
@@ -145,8 +145,8 @@ $_sa_tema_oscuro = getSuperadminTemaOscuro();
         .stat-label { font-size: .78rem; color: var(--sa-text-muted); margin-top: 3px; }
 
         /* Sections */
-        .sections { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        @media (max-width: 900px) { .sections { grid-template-columns: 1fr; } }
+        .sections { display: grid; grid-template-columns: minmax(300px, max-content) minmax(0, 1fr); gap: 20px; align-items: start; }
+        @media (max-width: 1024px) { .sections { grid-template-columns: 1fr; } }
 
         .section-card {
             background: var(--sa-surface); border: 1px solid var(--sa-border);
@@ -166,6 +166,7 @@ $_sa_tema_oscuro = getSuperadminTemaOscuro();
         /* Table inside section */
         #listaSucursales, #listaUsuarios { overflow-x: auto; }
         .sec-table { width: 100%; border-collapse: collapse; }
+        .sec-table th, .sec-table td { white-space: nowrap; }
         .sec-table thead th {
             background: var(--sa-surface-2); padding: 9px 16px;
             font-size: .72rem; font-weight: 700;
@@ -788,7 +789,7 @@ async function cargarSucursales() {
         document.getElementById('listaSucursales').innerHTML = `
         <table class="sec-table">
             <thead><tr>
-                <th>Nombre</th><th>Dirección</th><th>Usuarios</th><th>Estado</th><th></th>
+                <th>Nombre</th><th>Usuarios</th><th>Estado</th><th></th>
             </tr></thead>
             <tbody>${lista.map(s => `
             <tr id="srow-${s.id}" style="${s.archivada ? 'opacity:.55' : ''}">
@@ -796,7 +797,6 @@ async function cargarSucursales() {
                     ${esc(s.nombre)}
                     ${s.archivada ? '<span style="margin-left:6px;padding:1px 7px;border-radius:20px;font-size:.65rem;font-weight:700;text-transform:uppercase;background:var(--sa-bg);color:var(--sa-text-light)">Archivada</span>' : ''}
                 </td>
-                <td style="color:var(--sa-text-muted);font-size:.82rem">${esc(s.direccion||'—')}</td>
                 <td style="text-align:center">${s.total_usuarios}</td>
                 <td>${s.archivada
                     ? '<span style="padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:700;text-transform:uppercase;background:var(--sa-bg);color:var(--sa-text-light)">Archivada</span>'
@@ -812,9 +812,6 @@ async function cargarSucursales() {
                             <button class="btn-icon btn-edit" title="Editar" onclick="abrirEditSucursal(${s.id})"><i class="fas fa-pen"></i></button>
                             <button class="btn-icon btn-toggle ${s.activo?'':'off'}" title="${s.activo?'Desactivar':'Activar'}"
                                 onclick="toggleSucursal(${s.id}, ${s.activo ? 'true' : 'false'}, '${esc(s.nombre)}')"><i class="fas fa-power-off"></i></button>
-                            <button class="btn-icon" title="Archivar sucursal (optimizar costos)"
-                                style="background:#fef3c7;color:#b45309"
-                                onclick="archivarSucursal(${s.id},'${esc(s.nombre)}')"><i class="fas fa-archive"></i></button>
                         `}
                     </div>
                 </td>
@@ -953,7 +950,7 @@ async function cargarUsuarios() {
         }
         document.getElementById('listaUsuarios').innerHTML = `
         <table class="sec-table">
-            <thead><tr><th>Nombre</th><th>Usuario</th><th>Sucursal</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
+            <thead><tr><th>Nombre</th><th>Usuario</th><th>Sucursal</th><th>Rol</th><th style="text-align:center">Estado</th><th></th></tr></thead>
             <tbody>${lista.map(u => {
                 const acc = typeof u.accesos === 'string' ? JSON.parse(u.accesos) : (u.accesos||[]);
                 const primera = acc[0] ?? null;
@@ -975,9 +972,7 @@ async function cargarUsuarios() {
                     <td style="font-family:monospace;font-size:.82rem">${esc(u.username)}</td>
                     <td>${sucText}</td>
                     <td>${rolText}</td>
-                    <td><span style="padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:700;text-transform:uppercase;
-                        background:${u.activo?'#dcfce7':'#fee2e2'};color:${u.activo?'#16a34a':'#dc2626'}">
-                        ${u.activo?'Activo':'Inactivo'}</span></td>
+                    <td style="text-align:center"><span title="${u.activo?'Activo':'Inactivo'}" style="font-size:.95rem">${u.activo?'🟢':'🔴'}</span></td>
                     <td style="text-align:right">
                         <div style="display:flex;gap:5px;justify-content:flex-end">
                             <button class="btn-icon btn-edit" title="Editar"
@@ -1387,6 +1382,5 @@ cargarPagos();
 cargarSucursales();
 cargarUsuarios();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
