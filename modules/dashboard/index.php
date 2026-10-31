@@ -741,7 +741,6 @@ async function loadTop() {
                 <td style="color:var(--text-muted);font-weight:700">${i+1}</td>
                 <td>
                     <div style="font-weight:500;font-size:.83rem">${esc(p.nombre)}</div>
-                    <div style="font-size:.72rem;color:var(--text-light)">${esc(p.laboratorio || '—')} · ${esc(p.categoria || '—')}</div>
                     <div style="margin-top:4px;height:4px;background:var(--surface-2);border-radius:99px;overflow:hidden">
                         <div style="height:100%;width:${pct}%;background:var(--warning);border-radius:99px"></div>
                     </div>
