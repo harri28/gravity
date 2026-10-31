@@ -32,6 +32,7 @@ include '../../includes/header.php';
     position: relative;
     overflow: hidden;
     transition: box-shadow var(--transition);
+    height: 100%;   /* llena la columna -> todas las tarjetas KPI con la misma altura */
 }
 .kpi-card:hover { box-shadow: var(--shadow-md); }
 .kpi-card .accent {
