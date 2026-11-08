@@ -49,6 +49,25 @@ include '../../includes/header.php';
     .rep-tabs { width: 100%; }
 }
 
+/* Sesiones de caja: filas con color y aspecto seleccionable.
+   Acento izquierdo verde = abierta, rojo = cerrada (vars del sistema). */
+#se-tabla-body tr {
+    cursor: pointer;
+    transition: background .13s ease, box-shadow .13s ease;
+}
+#se-tabla-body tr.se-abierta { box-shadow: inset 3px 0 0 var(--success); }
+#se-tabla-body tr.se-cerrada { box-shadow: inset 3px 0 0 var(--danger); }
+#se-tabla-body tr.se-abierta:hover {
+    background: var(--success-light);
+    box-shadow: inset 3px 0 0 var(--success);
+}
+#se-tabla-body tr.se-cerrada:hover {
+    background: var(--danger-light);
+    box-shadow: inset 3px 0 0 var(--danger);
+}
+#se-tabla-body tr .se-chevron { opacity: .35; transition: opacity .13s ease; }
+#se-tabla-body tr:hover .se-chevron { opacity: 1; }
+
 /* Paginación (Stock Paralizado) -- mismo patrón que modules/inventario/index.php,
    no es un estilo global compartido. */
 #pz-pagination {
@@ -1209,15 +1228,15 @@ function seBuscar() {
                 const abierta = s.estado === 'abierta';
                 const estadoBadge = abierta
                     ? '<span class="badge badge-success">Abierta</span>'
-                    : '<span class="badge" style="background:var(--surface-2);color:var(--text-muted)">Cerrada</span>';
-                return `<tr style="cursor:pointer" onclick="seVerSesion(${i})" title="Ver ventas de esta sesión">
+                    : '<span class="badge badge-danger">Cerrada</span>';
+                return `<tr class="${abierta ? 'se-abierta' : 'se-cerrada'}" onclick="seVerSesion(${i})" title="Ver ventas de esta sesión">
                     <td><strong>${esc(s.usuario_apertura || s.nombre || 'Caja')}</strong>
                         <div style="font-size:.72rem;color:var(--text-muted)">Caja #${s.id}</div></td>
                     <td style="white-space:nowrap;font-size:.85rem">${seFechaHora(s.apertura_at)}</td>
-                    <td style="white-space:nowrap;font-size:.85rem">${abierta ? '<span style="color:var(--text-muted)">En curso</span>' : seFechaHora(s.cierre_at)}</td>
+                    <td style="white-space:nowrap;font-size:.85rem">${abierta ? '<span style="color:var(--success);font-weight:600">En curso</span>' : seFechaHora(s.cierre_at)}</td>
                     <td class="text-center">${estadoBadge}</td>
                     <td class="text-right">${s.total_ventas}</td>
-                    <td class="text-right"><strong>${money(s.ingresos)}</strong></td>
+                    <td class="text-right"><strong>${money(s.ingresos)}</strong> <i class="fas fa-chevron-right se-chevron" style="color:var(--primary);font-size:.72rem;margin-left:4px"></i></td>
                 </tr>`;
             }).join('');
         })
@@ -1290,23 +1309,6 @@ function seRenderSesion(data) {
             </table></div>
         </div>`;
 
-    const prods = Array.isArray(data.productos) ? data.productos : [];
-    const prodTable = `
-        <div style="width:100%">
-            <div style="font-weight:600;margin:4px 0 6px">Productos vendidos</div>
-            <div class="table-wrap"><table style="width:100%">
-                <thead><tr><th>Producto</th><th style="text-align:center">Cant.</th><th style="text-align:right">Total</th></tr></thead>
-                <tbody>${prods.length ? prods.map(p => {
-                    const c = parseFloat(p.cantidad) || 0;
-                    return `<tr>
-                        <td style="font-size:.85rem">${esc(p.nombre)}</td>
-                        <td style="text-align:center">${c.toFixed(c % 1 ? 2 : 0)}</td>
-                        <td style="text-align:right;white-space:nowrap">${money(p.total)}</td>
-                    </tr>`;
-                }).join('') : '<tr><td colspan="3" style="text-align:center;color:var(--text-light);padding:12px">Sin productos</td></tr>'}</tbody>
-            </table></div>
-        </div>`;
-
     const histBody = ventas.map(v => {
         const anulada = v.estado !== 'completada';
         const comp = v.comprobante_numero || v.numero_venta;
@@ -1347,9 +1349,6 @@ function seRenderSesion(data) {
         <div style="display:flex;flex-wrap:wrap;gap:20px;margin-bottom:16px">
             ${miniTable('Por comprobante', compRows, porComp, 'Tipo')}
             ${miniTable('Por método de pago', metRows, porMet, 'Método')}
-        </div>
-        <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
-            <div style="width:min(440px,100%)">${prodTable}</div>
         </div>
         <div style="font-weight:600;margin:4px 0 6px">Historial de ventas <span style="font-weight:400;font-size:.8rem;color:var(--text-muted)">(clic para ver el comprobante)</span></div>
         <div class="table-wrap"><table style="width:100%">
