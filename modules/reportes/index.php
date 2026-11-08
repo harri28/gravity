@@ -1358,6 +1358,11 @@ function seRenderSesion(data) {
                 <th>Método</th><th style="text-align:left">Total</th><th>Estado</th>
             </tr></thead>
             <tbody>${histBody}</tbody>
+            <tfoot><tr style="border-top:2px solid var(--border);font-weight:700">
+                <td colspan="5" style="text-align:right">Total (${vigentes.length} completadas)</td>
+                <td style="text-align:left;white-space:nowrap;color:var(--success)">${money(ingresos)}</td>
+                <td></td>
+            </tr></tfoot>
         </table></div>`;
 }
 
