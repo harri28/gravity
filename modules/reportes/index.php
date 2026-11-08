@@ -1144,7 +1144,7 @@ function vtvRender(ventas) {
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">
             ${tile('N° ventas', vigentes.length)}
             ${tile('Ingresos', money(ingresos), 'var(--success)')}
-            ${tile('Ticket prom.', money(ticket))}
+            ${tile('Gasto promedio por persona', money(ticket))}
             ${tile('IGV', money(igvTot))}
             ${tile('Anuladas', anuladas.length, anuladas.length ? 'var(--danger)' : 'var(--text)')}
         </div>
@@ -1292,7 +1292,7 @@ function seRenderSesion(data) {
 
     const prods = Array.isArray(data.productos) ? data.productos : [];
     const prodTable = `
-        <div style="flex:1;min-width:260px">
+        <div style="width:100%">
             <div style="font-weight:600;margin:4px 0 6px">Productos vendidos</div>
             <div class="table-wrap"><table style="width:100%">
                 <thead><tr><th>Producto</th><th style="text-align:center">Cant.</th><th style="text-align:right">Total</th></tr></thead>
@@ -1329,13 +1329,13 @@ function seRenderSesion(data) {
             <div><i class="fas fa-door-open" style="color:var(--success)"></i> Apertura: <strong style="color:var(--text)">${seFechaHora(s.apertura_at)}</strong></div>
             <div><i class="fas fa-door-closed"></i> Cierre: <strong style="color:var(--text)">${s.estado === 'abierta' ? 'En curso' : seFechaHora(s.cierre_at)}</strong></div>
             <div>Saldo inicial: <strong style="color:var(--text)">${money(s.saldo_inicial)}</strong></div>
-            <div>Saldo actual: <strong style="color:var(--text)">${money(s.saldo_actual)}</strong></div>
+            <div>Saldo al cerrar caja: <strong style="color:var(--text)">${money(s.saldo_actual)}</strong></div>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">
             ${tile('N° ventas', vigentes.length)}
             ${tile('Ingresos', money(ingresos), 'var(--success)')}
             ${tile('Utilidad', money(utilidad), utilidad >= 0 ? 'var(--success)' : 'var(--danger)')}
-            ${tile('Ticket prom.', money(ticket))}
+            ${tile('Gasto promedio por persona', money(ticket))}
             ${tile('IGV', money(igvTot))}
             ${tile('Anuladas', anuladas.length, anuladas.length ? 'var(--danger)' : 'var(--text)')}
         </div>
@@ -1347,7 +1347,9 @@ function seRenderSesion(data) {
         <div style="display:flex;flex-wrap:wrap;gap:20px;margin-bottom:16px">
             ${miniTable('Por comprobante', compRows, porComp, 'Tipo')}
             ${miniTable('Por método de pago', metRows, porMet, 'Método')}
-            ${prodTable}
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+            <div style="width:min(440px,100%)">${prodTable}</div>
         </div>
         <div style="font-weight:600;margin:4px 0 6px">Historial de ventas <span style="font-weight:400;font-size:.8rem;color:var(--text-muted)">(clic para ver el comprobante)</span></div>
         <div class="table-wrap"><table style="width:100%">
