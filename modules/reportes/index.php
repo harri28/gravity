@@ -323,6 +323,7 @@ include '../../includes/header.php';
         <div class="table-wrap">
             <table>
                 <thead><tr>
+                    <th>ID de caja</th>
                     <th>Caja</th>
                     <th>Apertura</th>
                     <th>Cierre</th>
@@ -331,7 +332,7 @@ include '../../includes/header.php';
                     <th class="text-right">Ingresos</th>
                 </tr></thead>
                 <tbody id="se-tabla-body">
-                    <tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></td></tr>
+                    <tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></td></tr>
                 </tbody>
             </table>
         </div>
@@ -1214,14 +1215,14 @@ function seBuscar() {
         hasta: document.getElementById('se-hasta').value
     }).toString();
     const body = document.getElementById('se-tabla-body');
-    body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></td></tr>';
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></td></tr>';
     fetch(API + '?action=sesiones_listar&' + qs)
         .then(r => r.json())
         .then(data => {
             const rows = Array.isArray(data) ? data : [];
             seRows = rows;
             if (!rows.length) {
-                body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-light)">Sin sesiones de caja en el periodo</td></tr>';
+                body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-light)">Sin sesiones de caja en el periodo</td></tr>';
                 return;
             }
             body.innerHTML = rows.map((s, i) => {
@@ -1230,8 +1231,8 @@ function seBuscar() {
                     ? '<span class="badge badge-success">Abierta</span>'
                     : '<span class="badge badge-danger">Cerrada</span>';
                 return `<tr class="${abierta ? 'se-abierta' : 'se-cerrada'}" onclick="seVerSesion(${i})" title="Ver ventas de esta sesión">
-                    <td><strong>${esc(s.usuario_apertura || s.nombre || 'Caja')}</strong>
-                        <div style="font-size:.72rem;color:var(--text-muted)">Caja #${s.id}</div></td>
+                    <td style="white-space:nowrap"><strong>#${s.id}</strong></td>
+                    <td><strong>${esc(s.usuario_apertura || s.nombre || 'Caja')}</strong></td>
                     <td style="white-space:nowrap;font-size:.85rem">${seFechaHora(s.apertura_at)}</td>
                     <td style="white-space:nowrap;font-size:.85rem">${abierta ? '<span style="color:var(--success);font-weight:600">En curso</span>' : seFechaHora(s.cierre_at)}</td>
                     <td class="text-center">${estadoBadge}</td>
