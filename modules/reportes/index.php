@@ -97,6 +97,9 @@ include '../../includes/header.php';
     <button class="rep-tab" id="rep-tab-btn-ventas" onclick="repSwitchTab('ventas')">
         <i class="fas fa-cash-register"></i> Ventas
     </button>
+    <button class="rep-tab" id="rep-tab-btn-sesiones" onclick="repSwitchTab('sesiones')">
+        <i class="fas fa-door-open"></i> Sesiones de caja
+    </button>
     <button class="rep-tab" id="rep-tab-btn-inventario" onclick="repSwitchTab('inventario')">
         <i class="fas fa-boxes"></i> Inventario
     </button>
@@ -262,6 +265,60 @@ include '../../includes/header.php';
     </div>
 
 </div><!-- /rep-pane-ventas -->
+
+
+<!-- ============================================================
+     PANE: SESIONES DE CAJA (apertura -> cierre)
+     ============================================================ -->
+<div id="rep-pane-sesiones" class="rep-pane" style="display:none">
+
+    <div class="card" style="margin-bottom:20px">
+        <div style="padding:10px 16px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+            <div class="form-group" style="margin:0;flex:1;min-width:140px">
+                <label class="form-label">Desde</label>
+                <input type="date" id="se-desde" class="form-control" value="<?= date('Y-m-d') ?>">
+            </div>
+            <div class="form-group" style="margin:0;flex:1;min-width:140px">
+                <label class="form-label">Hasta</label>
+                <input type="date" id="se-hasta" class="form-control" value="<?= date('Y-m-d') ?>">
+            </div>
+            <button class="btn btn-primary" onclick="seBuscar()" style="margin-bottom:0">
+                <i class="fas fa-search"></i> Buscar
+            </button>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:0">
+                <span style="font-size:.78rem;color:var(--text-muted)">Rápido:</span>
+                <button class="btn btn-ghost btn-sm" onclick="seSetDia(0)">Hoy</button>
+                <button class="btn btn-ghost btn-sm" onclick="seSetDia(1)">Ayer</button>
+                <button class="btn btn-ghost btn-sm" onclick="seSetDia(2)">Antes de ayer</button>
+                <button class="btn btn-ghost btn-sm" onclick="repSetPeriodo('se','semana')">Esta semana</button>
+                <button class="btn btn-ghost btn-sm" onclick="repSetPeriodo('se','mes')">Este mes</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Sesiones de caja</div>
+            <div style="font-size:.8rem;color:var(--text-muted);margin-left:auto">Clic en una sesión para ver sus ventas</div>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr>
+                    <th>Caja</th>
+                    <th>Apertura</th>
+                    <th>Cierre</th>
+                    <th class="text-center">Estado</th>
+                    <th class="text-right">N° Ventas</th>
+                    <th class="text-right">Ingresos</th>
+                </tr></thead>
+                <tbody id="se-tabla-body">
+                    <tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div><!-- /rep-pane-sesiones -->
 
 
 <!-- ============================================================
@@ -680,6 +737,38 @@ include '../../includes/header.php';
     </div>
 </div>
 
+<!-- ===================== MODAL: Detalle de una sesión de caja ===================== -->
+<div class="modal-overlay" id="modal-se-sesion">
+    <div class="modal" style="max-width:900px">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="fas fa-door-open" style="color:var(--primary);margin-right:8px"></i>
+                <span id="se-det-titulo">Sesión de caja</span>
+            </h3>
+            <button class="modal-close" onclick="closeModal('modal-se-sesion')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body" id="se-det-body">
+            <div style="text-align:center;padding:40px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== MODAL: Comprobante de una venta ===================== -->
+<div class="modal-overlay" id="modal-se-comprobante">
+    <div class="modal" style="max-width:560px">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="fas fa-receipt" style="color:var(--primary);margin-right:8px"></i>
+                <span id="se-cmp-titulo">Comprobante</span>
+            </h3>
+            <button class="modal-close" onclick="closeModal('modal-se-comprobante')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body" id="se-cmp-body">
+            <div style="text-align:center;padding:40px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></div>
+        </div>
+    </div>
+</div>
+
 <div class="app-toast-container" id="toast-container"></div>
 
 <script>
@@ -700,6 +789,7 @@ function repSwitchTab(tab) {
         _repTabLoaded[tab] = true;
         if (tab === 'costos')      { ccCargarProveedores(); ccBuscar(); }
         if (tab === 'ventas')      { vtBuscar(); }
+        if (tab === 'sesiones')    { seBuscar(); }
         if (tab === 'inventario')  { invCargarCategorias(); invBuscar(); }
         if (tab === 'caja')        { cjBuscar(); }
         if (tab === 'productos')   { prCargarCategorias(); prBuscar(); }
@@ -721,6 +811,7 @@ function repSetPeriodo(prefix, p) {
     document.getElementById(prefix + '-hasta').value = hasta;
     if (prefix === 'cc') ccBuscar();
     if (prefix === 'vt') vtBuscar();
+    if (prefix === 'se') seBuscar();
     if (prefix === 'cj') cjBuscar();
     if (prefix === 'pr') prBuscar();
     if (prefix === 'an') anBuscar();
@@ -964,13 +1055,11 @@ function vtVerVentas(i) {
     const row = vtRows[i];
     if (!row) return;
     const vendedor = row.etiqueta;
-    const desde = document.getElementById('vt-desde').value;
-    const hasta = document.getElementById('vt-hasta').value;
     document.getElementById('vtv-titulo').textContent = 'Resumen de ventas — ' + vendedor;
     document.getElementById('vtv-body').innerHTML =
         '<div style="text-align:center;padding:40px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></div>';
     openModal('modal-vt-ventas');
-    fetch(API + '?action=ventas_por_vendedor&vendedor=' + encodeURIComponent(vendedor) + '&desde=' + encodeURIComponent(desde) + '&hasta=' + encodeURIComponent(hasta))
+    fetch(API + '?action=ventas_por_vendedor&' + vtParams({ vendedor: vendedor }))
         .then(r => r.json())
         .then(data => {
             if (data.error) { showToast(data.message, 'error'); closeModal('modal-vt-ventas'); return; }
@@ -1075,6 +1164,256 @@ function vtvRender(ventas) {
             </tr></thead>
             <tbody>${histBody}</tbody>
         </table></div>`;
+}
+
+// ================================================================
+// SESIONES DE CAJA (apertura -> cierre)
+// Recorrido: lista de sesiones -> ventas de la sesión -> comprobante.
+// ================================================================
+
+function seFechaHora(s) {
+    if (!s) return '—';
+    const d = new Date(String(s).replace(' ', 'T'));
+    if (isNaN(d)) return '—';
+    const p = n => String(n).padStart(2, '0');
+    return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+// Botones rápidos de día único (0=hoy, 1=ayer, 2=antes de ayer)
+function seSetDia(n) {
+    const d = new Date(); d.setDate(d.getDate() - n);
+    const f = x => x.toISOString().slice(0, 10);
+    document.getElementById('se-desde').value = f(d);
+    document.getElementById('se-hasta').value = f(d);
+    seBuscar();
+}
+
+let seRows = [];
+function seBuscar() {
+    const qs = new URLSearchParams({
+        desde: document.getElementById('se-desde').value,
+        hasta: document.getElementById('se-hasta').value
+    }).toString();
+    const body = document.getElementById('se-tabla-body');
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></td></tr>';
+    fetch(API + '?action=sesiones_listar&' + qs)
+        .then(r => r.json())
+        .then(data => {
+            const rows = Array.isArray(data) ? data : [];
+            seRows = rows;
+            if (!rows.length) {
+                body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-light)">Sin sesiones de caja en el periodo</td></tr>';
+                return;
+            }
+            body.innerHTML = rows.map((s, i) => {
+                const abierta = s.estado === 'abierta';
+                const estadoBadge = abierta
+                    ? '<span class="badge badge-success">Abierta</span>'
+                    : '<span class="badge" style="background:var(--surface-2);color:var(--text-muted)">Cerrada</span>';
+                return `<tr style="cursor:pointer" onclick="seVerSesion(${i})" title="Ver ventas de esta sesión">
+                    <td><strong>${esc(s.usuario_apertura || s.nombre || 'Caja')}</strong>
+                        <div style="font-size:.72rem;color:var(--text-muted)">Caja #${s.id}</div></td>
+                    <td style="white-space:nowrap;font-size:.85rem">${seFechaHora(s.apertura_at)}</td>
+                    <td style="white-space:nowrap;font-size:.85rem">${abierta ? '<span style="color:var(--text-muted)">En curso</span>' : seFechaHora(s.cierre_at)}</td>
+                    <td class="text-center">${estadoBadge}</td>
+                    <td class="text-right">${s.total_ventas}</td>
+                    <td class="text-right"><strong>${money(s.ingresos)}</strong></td>
+                </tr>`;
+            }).join('');
+        })
+        .catch(() => showToast('Error al cargar las sesiones de caja', 'error'));
+}
+
+function seVerSesion(i) {
+    const s = seRows[i];
+    if (!s) return;
+    const abierta = s.estado === 'abierta';
+    document.getElementById('se-det-titulo').textContent =
+        (s.usuario_apertura || s.nombre || 'Caja') + ' · Caja #' + s.id + ' · ' + (abierta ? 'Abierta' : 'Cerrada');
+    document.getElementById('se-det-body').innerHTML =
+        '<div style="text-align:center;padding:40px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></div>';
+    openModal('modal-se-sesion');
+    fetch(API + '?action=sesion_detalle&caja_id=' + s.id)
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) { showToast(data.message, 'error'); closeModal('modal-se-sesion'); return; }
+            document.getElementById('se-det-body').innerHTML = seRenderSesion(data);
+        })
+        .catch(() => { showToast('Error al cargar la sesión', 'error'); closeModal('modal-se-sesion'); });
+}
+
+function seRenderSesion(data) {
+    const ventas   = Array.isArray(data.ventas) ? data.ventas : [];
+    const vigentes = ventas.filter(v => v.estado === 'completada');
+    const anuladas = ventas.filter(v => v.estado !== 'completada');
+    const ingresos = vigentes.reduce((a, v) => a + parseFloat(v.total || 0), 0);
+    const igvTot   = vigentes.reduce((a, v) => a + parseFloat(v.igv   || 0), 0);
+    const ticket   = vigentes.length ? ingresos / vigentes.length : 0;
+    const fechas   = ventas.map(v => new Date(v.created_at)).sort((a, b) => a - b);
+    const primera  = fechas[0], ultima = fechas[fechas.length - 1];
+    const utilidad = parseFloat(data.utilidad || 0);
+    const unidades = parseFloat(data.unidades || 0);
+    const s        = data.sesion || {};
+
+    const porComp = {}, porMet = {};
+    vigentes.forEach(v => {
+        const t = vtvTipoLabel(v.comprobante_numero ? v.tipo_comprobante : 'nota_venta');
+        porComp[t] = porComp[t] || { n: 0, total: 0 };
+        porComp[t].n++; porComp[t].total += parseFloat(v.total || 0);
+        const m = vtvMetodoLabel(v.tipo_pago);
+        porMet[m] = porMet[m] || { n: 0, total: 0 };
+        porMet[m].n++; porMet[m].total += parseFloat(v.total || 0);
+    });
+    const compRows = Object.keys(porComp).sort((a, b) => porComp[b].total - porComp[a].total);
+    const metRows  = Object.keys(porMet).sort((a, b) => porMet[b].total - porMet[a].total);
+
+    const tile = (label, val, accent) => `
+        <div style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px">
+            <div style="font-size:.68rem;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted)">${label}</div>
+            <div style="font-size:1.15rem;font-weight:700;margin-top:3px;color:${accent || 'var(--text)'}">${val}</div>
+        </div>`;
+    const dateTile = (label, val) => `
+        <div style="flex:1;min-width:150px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px">
+            <div style="font-size:.68rem;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted)">${label}</div>
+            <div style="font-size:.95rem;font-weight:600;margin-top:3px">${val}</div>
+        </div>`;
+    const miniTable = (titulo, rows, obj, col1) => `
+        <div style="flex:1;min-width:230px">
+            <div style="font-weight:600;margin:4px 0 6px">${titulo}</div>
+            <div class="table-wrap"><table style="width:100%">
+                <thead><tr><th>${col1}</th><th style="text-align:center">N°</th><th style="text-align:right">Total</th></tr></thead>
+                <tbody>${rows.length ? rows.map(k => `<tr>
+                    <td style="font-size:.85rem">${esc(k)}</td>
+                    <td style="text-align:center">${obj[k].n}</td>
+                    <td style="text-align:right;white-space:nowrap">${money(obj[k].total)}</td>
+                </tr>`).join('') : '<tr><td colspan="3" style="text-align:center;color:var(--text-light);padding:12px">—</td></tr>'}</tbody>
+            </table></div>
+        </div>`;
+
+    const prods = Array.isArray(data.productos) ? data.productos : [];
+    const prodTable = `
+        <div style="flex:1;min-width:260px">
+            <div style="font-weight:600;margin:4px 0 6px">Productos vendidos</div>
+            <div class="table-wrap"><table style="width:100%">
+                <thead><tr><th>Producto</th><th style="text-align:center">Cant.</th><th style="text-align:right">Total</th></tr></thead>
+                <tbody>${prods.length ? prods.map(p => {
+                    const c = parseFloat(p.cantidad) || 0;
+                    return `<tr>
+                        <td style="font-size:.85rem">${esc(p.nombre)}</td>
+                        <td style="text-align:center">${c.toFixed(c % 1 ? 2 : 0)}</td>
+                        <td style="text-align:right;white-space:nowrap">${money(p.total)}</td>
+                    </tr>`;
+                }).join('') : '<tr><td colspan="3" style="text-align:center;color:var(--text-light);padding:12px">Sin productos</td></tr>'}</tbody>
+            </table></div>
+        </div>`;
+
+    const histBody = ventas.map(v => {
+        const anulada = v.estado !== 'completada';
+        const comp = v.comprobante_numero || v.numero_venta;
+        const tipo = vtvTipoLabel(v.comprobante_numero ? v.tipo_comprobante : 'nota_venta');
+        const dt = new Date(v.created_at);
+        const hora = dt.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+        return `<tr style="cursor:pointer${anulada ? ';opacity:.55' : ''}" onclick="seVerComprobante(${v.id})" title="Ver comprobante">
+            <td style="white-space:nowrap"><strong>${esc(v.numero_venta)}</strong></td>
+            <td style="font-size:.82rem;white-space:nowrap">${dt.toLocaleDateString('es-PE')} ${hora}</td>
+            <td style="font-size:.85rem">${esc(v.cliente)}</td>
+            <td style="font-size:.85rem;white-space:nowrap">${esc(comp)}<div style="font-size:.72rem;color:var(--text-muted)">${esc(tipo)}</div></td>
+            <td style="font-size:.85rem;white-space:nowrap">${esc(vtvMetodoLabel(v.tipo_pago))}</td>
+            <td style="text-align:left;white-space:nowrap"><strong>${money(v.total)}</strong></td>
+            <td style="white-space:nowrap"><span class="badge ${anulada ? 'badge-danger' : 'badge-success'}">${anulada ? 'Anulada' : 'Completada'}</span> <i class="fas fa-chevron-right" style="color:var(--primary);font-size:.7rem"></i></td>
+        </tr>`;
+    }).join('');
+
+    return `
+        <div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:12px;font-size:.85rem;color:var(--text-muted)">
+            <div><i class="fas fa-door-open" style="color:var(--success)"></i> Apertura: <strong style="color:var(--text)">${seFechaHora(s.apertura_at)}</strong></div>
+            <div><i class="fas fa-door-closed"></i> Cierre: <strong style="color:var(--text)">${s.estado === 'abierta' ? 'En curso' : seFechaHora(s.cierre_at)}</strong></div>
+            <div>Saldo inicial: <strong style="color:var(--text)">${money(s.saldo_inicial)}</strong></div>
+            <div>Saldo actual: <strong style="color:var(--text)">${money(s.saldo_actual)}</strong></div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+            ${tile('N° ventas', vigentes.length)}
+            ${tile('Ingresos', money(ingresos), 'var(--success)')}
+            ${tile('Utilidad', money(utilidad), utilidad >= 0 ? 'var(--success)' : 'var(--danger)')}
+            ${tile('Ticket prom.', money(ticket))}
+            ${tile('IGV', money(igvTot))}
+            ${tile('Anuladas', anuladas.length, anuladas.length ? 'var(--danger)' : 'var(--text)')}
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+            ${dateTile('Unidades vendidas', unidades.toFixed(unidades % 1 ? 2 : 0))}
+            ${dateTile('Primera venta', primera ? seFechaHora(primera) : '—')}
+            ${dateTile('Última venta', ultima ? seFechaHora(ultima) : '—')}
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:20px;margin-bottom:16px">
+            ${miniTable('Por comprobante', compRows, porComp, 'Tipo')}
+            ${miniTable('Por método de pago', metRows, porMet, 'Método')}
+            ${prodTable}
+        </div>
+        <div style="font-weight:600;margin:4px 0 6px">Historial de ventas <span style="font-weight:400;font-size:.8rem;color:var(--text-muted)">(clic para ver el comprobante)</span></div>
+        <div class="table-wrap"><table style="width:100%">
+            <thead><tr>
+                <th>N° venta</th><th>Fecha / hora</th><th>Cliente</th><th>Comprobante</th>
+                <th>Método</th><th style="text-align:left">Total</th><th>Estado</th>
+            </tr></thead>
+            <tbody>${histBody}</tbody>
+        </table></div>`;
+}
+
+function seVerComprobante(id) {
+    document.getElementById('se-cmp-titulo').textContent = 'Comprobante';
+    document.getElementById('se-cmp-body').innerHTML =
+        '<div style="text-align:center;padding:40px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></div>';
+    openModal('modal-se-comprobante');
+    fetch(API + '?action=venta_comprobante&id=' + id)
+        .then(r => r.json())
+        .then(v => {
+            if (v.error) { showToast(v.message, 'error'); closeModal('modal-se-comprobante'); return; }
+            document.getElementById('se-cmp-body').innerHTML = seRenderComprobante(v);
+        })
+        .catch(() => { showToast('Error al cargar el comprobante', 'error'); closeModal('modal-se-comprobante'); });
+}
+
+function seRenderComprobante(v) {
+    const comp = v.comprobante_numero || v.numero_venta;
+    const tipo = vtvTipoLabel(v.comprobante_numero ? v.tipo_comprobante : 'nota_venta');
+    const dt = new Date(v.created_at);
+    const anulada = v.estado !== 'completada';
+    const items = Array.isArray(v.items) ? v.items : [];
+    const itemsBody = items.map(it => {
+        const c = parseFloat(it.cantidad) || 0;
+        return `<tr>
+            <td style="font-size:.85rem">${esc(it.producto_nombre)}${it.codigo ? `<div style="font-size:.72rem;color:var(--text-muted)">${esc(it.codigo)}</div>` : ''}</td>
+            <td style="text-align:center">${c.toFixed(c % 1 ? 2 : 0)}</td>
+            <td style="text-align:right;white-space:nowrap">${money(it.precio_unitario)}</td>
+            <td style="text-align:right;white-space:nowrap">${money(it.precio_total)}</td>
+        </tr>`;
+    }).join('');
+    const line = (l, val, strong) => `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:.88rem">
+        <span style="color:var(--text-muted)">${l}</span><span${strong ? ' style="font-weight:700;font-size:1rem"' : ''}>${val}</span></div>`;
+
+    return `
+        <div style="margin-bottom:12px">
+            <div style="font-size:1.1rem;font-weight:700">${esc(comp)}</div>
+            <div style="font-size:.82rem;color:var(--text-muted)">${esc(tipo)} · ${esc(v.numero_venta)}</div>
+            <div style="font-size:.82rem;color:var(--text-muted)">${dt.toLocaleString('es-PE')}</div>
+            ${anulada ? '<span class="badge badge-danger" style="margin-top:4px;display:inline-block">Anulada</span>' : ''}
+        </div>
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:12px">
+            <div style="font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted)">Cliente</div>
+            <div style="font-weight:600">${esc(v.cliente)}</div>
+            ${v.numero_documento ? `<div style="font-size:.82rem;color:var(--text-muted)">${esc(v.tipo_documento_codigo || 'Doc')}: ${esc(v.numero_documento)}</div>` : ''}
+        </div>
+        <div class="table-wrap"><table style="width:100%">
+            <thead><tr><th>Producto</th><th style="text-align:center">Cant.</th><th style="text-align:right">P. Unit.</th><th style="text-align:right">Importe</th></tr></thead>
+            <tbody>${itemsBody || '<tr><td colspan="4" style="text-align:center;color:var(--text-light);padding:14px">Sin items</td></tr>'}</tbody>
+        </table></div>
+        <div style="margin-top:12px;max-width:260px;margin-left:auto">
+            ${line('Subtotal', money(v.subtotal))}
+            ${parseFloat(v.descuento || 0) > 0 ? line('Descuento', '- ' + money(v.descuento)) : ''}
+            ${line('IGV', money(v.igv))}
+            ${line('Total', money(v.total), true)}
+            ${line('Método de pago', vtvMetodoLabel(v.tipo_pago))}
+        </div>`;
 }
 
 // ================================================================
