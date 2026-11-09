@@ -68,9 +68,9 @@ include '../../includes/header.php';
 #se-tabla-body tr .se-chevron { opacity: .35; transition: opacity .13s ease; }
 #se-tabla-body tr:hover .se-chevron { opacity: 1; }
 
-/* Paginación (Stock Paralizado) -- mismo patrón que modules/inventario/index.php,
-   no es un estilo global compartido. */
-#pz-pagination {
+/* Paginación (Stock Paralizado y Sesiones) -- mismo patrón que
+   modules/inventario/index.php, no es un estilo global compartido. */
+#pz-pagination, #se-pagination {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -317,7 +317,7 @@ include '../../includes/header.php';
 
     <div class="card">
         <div class="card-header">
-            <div class="card-title">Sesiones de caja</div>
+            <div class="card-title">Sesiones de caja <span id="se-rango-label" style="font-weight:500;font-size:.82rem;color:var(--text-muted)">— últimos 7 días</span></div>
             <div style="font-size:.8rem;color:var(--text-muted);margin-left:auto">Clic en una sesión para ver sus ventas</div>
         </div>
         <div class="table-wrap">
@@ -336,6 +336,7 @@ include '../../includes/header.php';
                 </tbody>
             </table>
         </div>
+        <div id="se-pagination"></div>
     </div>
 
 </div><!-- /rep-pane-sesiones -->
@@ -1234,40 +1235,97 @@ function seSetDia(n) {
     seBuscar();
 }
 
+// 'YYYY-MM-DD' -> 'DD/MM/YYYY'
+function seFechaDMY(s) {
+    const p = String(s).split('-');
+    return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : s;
+}
+// Etiqueta legible del rango elegido (junto al título de la tarjeta).
+function seRangoLabel(desde, hasta) {
+    const f = d => d.toISOString().slice(0, 10);
+    const hoy = new Date();
+    const d1 = new Date(hoy); d1.setDate(hoy.getDate() - 1);
+    const d2 = new Date(hoy); d2.setDate(hoy.getDate() - 2);
+    const d6 = new Date(hoy); d6.setDate(hoy.getDate() - 6);
+    if (desde === hasta) {
+        if (desde === f(hoy)) return 'Hoy';
+        if (desde === f(d1))  return 'Ayer';
+        if (desde === f(d2))  return 'Antes de ayer';
+        return seFechaDMY(desde);
+    }
+    if (desde === f(d6) && hasta === f(hoy)) return 'últimos 7 días';
+    return seFechaDMY(desde) + ' a ' + seFechaDMY(hasta);
+}
+
+const SE_PAGE_SIZE = 15;
 let seRows = [];
+let sePage = 1;
+
 function seBuscar() {
-    const qs = new URLSearchParams({
-        desde: document.getElementById('se-desde').value,
-        hasta: document.getElementById('se-hasta').value
-    }).toString();
+    const desde = document.getElementById('se-desde').value;
+    const hasta = document.getElementById('se-hasta').value;
+    document.getElementById('se-rango-label').textContent = '— ' + seRangoLabel(desde, hasta);
+    const qs = new URLSearchParams({ desde, hasta }).toString();
     const body = document.getElementById('se-tabla-body');
     body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-spinner fa-spin"></i></td></tr>';
+    document.getElementById('se-pagination').innerHTML = '';
     fetch(API + '?action=sesiones_listar&' + qs)
         .then(r => r.json())
         .then(data => {
-            const rows = Array.isArray(data) ? data : [];
-            seRows = rows;
-            if (!rows.length) {
+            seRows = Array.isArray(data) ? data : [];
+            if (!seRows.length) {
                 body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-light)">Sin sesiones de caja en el periodo</td></tr>';
+                document.getElementById('se-pagination').innerHTML = '';
                 return;
             }
-            body.innerHTML = rows.map((s, i) => {
-                const abierta = s.estado === 'abierta';
-                const estadoBadge = abierta
-                    ? '<span class="badge badge-success">Abierta</span>'
-                    : '<span class="badge badge-danger">Cerrada</span>';
-                return `<tr class="${abierta ? 'se-abierta' : 'se-cerrada'}" onclick="seVerSesion(${i})" title="Ver ventas de esta sesión">
-                    <td style="white-space:nowrap"><strong>#${s.id}</strong></td>
-                    <td><strong>${esc(s.usuario_apertura || s.nombre || 'Caja')}</strong></td>
-                    <td style="white-space:nowrap;font-size:.85rem">${seFechaHora(s.apertura_at)}</td>
-                    <td style="white-space:nowrap;font-size:.85rem">${abierta ? '<span style="color:var(--success);font-weight:600">En curso</span>' : seFechaHora(s.cierre_at)}</td>
-                    <td class="text-center">${estadoBadge}</td>
-                    <td class="text-right">${s.total_ventas}</td>
-                    <td class="text-right"><strong>${money(s.ingresos)}</strong> <i class="fas fa-chevron-right se-chevron" style="color:var(--primary);font-size:.72rem;margin-left:4px"></i></td>
-                </tr>`;
-            }).join('');
+            seRenderPage(1);
         })
         .catch(() => showToast('Error al cargar las sesiones de caja', 'error'));
+}
+
+function seRenderPage(page) {
+    sePage = page;
+    const start = (page - 1) * SE_PAGE_SIZE;
+    const slice = seRows.slice(start, start + SE_PAGE_SIZE);
+    document.getElementById('se-tabla-body').innerHTML = slice.map((s, idx) => {
+        const i = start + idx; // índice real dentro de seRows (para seVerSesion)
+        const abierta = s.estado === 'abierta';
+        const estadoBadge = abierta
+            ? '<span class="badge badge-success">Abierta</span>'
+            : '<span class="badge badge-danger">Cerrada</span>';
+        return `<tr class="${abierta ? 'se-abierta' : 'se-cerrada'}" onclick="seVerSesion(${i})" title="Ver ventas de esta sesión">
+            <td style="white-space:nowrap"><strong>#${s.id}</strong></td>
+            <td><strong>${esc(s.usuario_apertura || s.nombre || 'Caja')}</strong></td>
+            <td style="white-space:nowrap;font-size:.85rem">${seFechaHora(s.apertura_at)}</td>
+            <td style="white-space:nowrap;font-size:.85rem">${abierta ? '<span style="color:var(--success);font-weight:600">En curso</span>' : seFechaHora(s.cierre_at)}</td>
+            <td class="text-center">${estadoBadge}</td>
+            <td class="text-right">${s.total_ventas}</td>
+            <td class="text-right"><strong>${money(s.ingresos)}</strong> <i class="fas fa-chevron-right se-chevron" style="color:var(--primary);font-size:.72rem;margin-left:4px"></i></td>
+        </tr>`;
+    }).join('');
+    seRenderPagination(seRows.length, page);
+}
+
+function seRenderPagination(total, page) {
+    const pages = Math.ceil(total / SE_PAGE_SIZE);
+    const el = document.getElementById('se-pagination');
+    if (pages <= 1) { el.innerHTML = ''; return; }
+
+    const shown = new Set([1, pages]);
+    for (let i = Math.max(1, page - 1); i <= Math.min(pages, page + 1); i++) shown.add(i);
+    const sorted = [...shown].sort((a, b) => a - b);
+
+    const items = [];
+    let prev = 0;
+    sorted.forEach(n => { if (n - prev > 1) items.push('...'); items.push(n); prev = n; });
+
+    let html = `<button class="pg-btn" onclick="seRenderPage(${page - 1})" ${page === 1 ? 'disabled' : ''}>&#8249;</button>`;
+    items.forEach(item => {
+        if (item === '...') html += `<span class="pg-ellipsis">…</span>`;
+        else html += `<button class="pg-btn${item === page ? ' active' : ''}" onclick="seRenderPage(${item})">${item}</button>`;
+    });
+    html += `<button class="pg-btn" onclick="seRenderPage(${page + 1})" ${page === pages ? 'disabled' : ''}>&#8250;</button>`;
+    el.innerHTML = html;
 }
 
 function seVerSesion(i) {
