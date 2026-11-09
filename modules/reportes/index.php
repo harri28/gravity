@@ -1071,6 +1071,32 @@ function vtvTipoLabel(t) {
     return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
+// "Por método de pago" a partir del desglose real de cada venta
+// (payment_breakdown). Reparte cada monto a su método; si una venta no tiene
+// desglose (crédito / ventas antiguas) cae por su tipo_pago con el total
+// completo, de modo que la suma por método cuadra con los ingresos. Esto
+// corrige los pagos divididos (ej. mitad Plin / mitad efectivo), que antes se
+// cargaban enteros a un solo método. Solo cuenta ventas completadas.
+function rptPorMetodo(ventas) {
+    const porMet = {};
+    const add = (label, n, monto) => {
+        porMet[label] = porMet[label] || { n: 0, total: 0 };
+        porMet[label].n += n;
+        porMet[label].total += monto;
+    };
+    (ventas || []).forEach(v => {
+        if (v.estado !== 'completada') return;
+        let bd = v.payment_breakdown;
+        if (typeof bd === 'string') { try { bd = JSON.parse(bd); } catch (e) { bd = null; } }
+        if (Array.isArray(bd) && bd.length) {
+            bd.forEach(p => add(vtvMetodoLabel(p.method), 1, parseFloat(p.amount || 0)));
+        } else {
+            add(vtvMetodoLabel(v.tipo_pago), 1, parseFloat(v.total || 0));
+        }
+    });
+    return porMet;
+}
+
 function vtVerVentas(i) {
     const row = vtRows[i];
     if (!row) return;
@@ -1104,17 +1130,17 @@ function vtvRender(ventas) {
     const primera   = fechas[0], ultima = fechas[fechas.length - 1];
 
     // Agrupaciones (solo ventas vigentes)
-    const porComp = {}, porMet = {};
+    const porComp = {};
     vigentes.forEach(v => {
         const t = vtvTipoLabel(v.comprobante_numero ? v.tipo_comprobante : 'nota_venta');
         porComp[t] = porComp[t] || { n: 0, total: 0 };
         porComp[t].n++; porComp[t].total += parseFloat(v.total || 0);
-        const m = vtvMetodoLabel(v.tipo_pago);
-        porMet[m] = porMet[m] || { n: 0, total: 0 };
-        porMet[m].n++; porMet[m].total += parseFloat(v.total || 0);
     });
     const compRows = Object.keys(porComp).sort((a, b) => porComp[b].total - porComp[a].total);
-    const metRows  = Object.keys(porMet).sort((a, b) => porMet[b].total - porMet[a].total);
+
+    // Por método de pago: desglose real (payment_breakdown), cuadra con splits.
+    const porMet = rptPorMetodo(ventas);
+    const metRows = Object.keys(porMet).sort((a, b) => porMet[b].total - porMet[a].total);
 
     const tile = (label, val, accent) => `
         <div style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px">
@@ -1275,17 +1301,17 @@ function seRenderSesion(data) {
     const unidades = parseFloat(data.unidades || 0);
     const s        = data.sesion || {};
 
-    const porComp = {}, porMet = {};
+    const porComp = {};
     vigentes.forEach(v => {
         const t = vtvTipoLabel(v.comprobante_numero ? v.tipo_comprobante : 'nota_venta');
         porComp[t] = porComp[t] || { n: 0, total: 0 };
         porComp[t].n++; porComp[t].total += parseFloat(v.total || 0);
-        const m = vtvMetodoLabel(v.tipo_pago);
-        porMet[m] = porMet[m] || { n: 0, total: 0 };
-        porMet[m].n++; porMet[m].total += parseFloat(v.total || 0);
     });
     const compRows = Object.keys(porComp).sort((a, b) => porComp[b].total - porComp[a].total);
-    const metRows  = Object.keys(porMet).sort((a, b) => porMet[b].total - porMet[a].total);
+
+    // Por método de pago: desglose real (payment_breakdown), cuadra con splits.
+    const porMet = rptPorMetodo(ventas);
+    const metRows = Object.keys(porMet).sort((a, b) => porMet[b].total - porMet[a].total);
 
     const tile = (label, val, accent) => `
         <div style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px">

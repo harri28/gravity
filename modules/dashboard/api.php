@@ -264,12 +264,28 @@ switch ($action) {
             ? "DATE(created_at) >= CURRENT_DATE - INTERVAL '7 days'"
             : "DATE(created_at) = CURRENT_DATE";
 
+        // Por metodo de pago: se lee del desglose real (payment_breakdown) para
+        // que los pagos divididos repartan cada monto a su metodo. Las ventas sin
+        // desglose (credito / antiguas) caen por su tipo_pago con el total
+        // completo, para que la suma por metodo siga cuadrando con los ingresos.
         $rows = $db->query("
-            SELECT tipo_pago, COUNT(*) AS total_ventas, COALESCE(SUM(total), 0) AS monto
-            FROM ventas
-            WHERE estado = 'completada' AND $where
-            GROUP BY tipo_pago
-            ORDER BY monto DESC
+            WITH pb AS (
+                SELECT v.tipo_pago, v.total,
+                       CASE WHEN jsonb_typeof(v.payment_breakdown) = 'array'
+                            THEN v.payment_breakdown ELSE '[]'::jsonb END AS bd
+                FROM ventas v
+                WHERE v.estado = 'completada' AND $where
+            ),
+            metodos AS (
+                SELECT elem->>'method' AS metodo, (elem->>'amount')::numeric AS monto
+                FROM pb CROSS JOIN LATERAL jsonb_array_elements(pb.bd) AS elem
+                WHERE jsonb_array_length(pb.bd) > 0
+                UNION ALL
+                SELECT tipo_pago AS metodo, total AS monto
+                FROM pb WHERE jsonb_array_length(pb.bd) = 0
+            )
+            SELECT metodo AS tipo_pago, COUNT(*) AS total_ventas, COALESCE(SUM(monto), 0) AS monto
+            FROM metodos GROUP BY metodo ORDER BY monto DESC
         ")->fetchAll();
         echo json_encode($rows);
         break;
@@ -467,12 +483,26 @@ switch ($action) {
     // ---- GET: Metodos de pago del periodo ----
     case 'metodos_periodo':
         $f = dashVentasFiltro($db);
+        // Por metodo de pago desde el desglose real (payment_breakdown), con
+        // fallback a tipo_pago para ventas sin desglose; asi cuadra con splits.
         $s = $db->prepare("
-            SELECT tipo_pago, COUNT(*) AS total_ventas, COALESCE(SUM(total), 0) AS monto
-            FROM ventas
-            WHERE estado = 'completada' AND {$f['cond']}
-            GROUP BY tipo_pago
-            ORDER BY monto DESC
+            WITH pb AS (
+                SELECT v.tipo_pago, v.total,
+                       CASE WHEN jsonb_typeof(v.payment_breakdown) = 'array'
+                            THEN v.payment_breakdown ELSE '[]'::jsonb END AS bd
+                FROM ventas v
+                WHERE v.estado = 'completada' AND {$f['condV']}
+            ),
+            metodos AS (
+                SELECT elem->>'method' AS metodo, (elem->>'amount')::numeric AS monto
+                FROM pb CROSS JOIN LATERAL jsonb_array_elements(pb.bd) AS elem
+                WHERE jsonb_array_length(pb.bd) > 0
+                UNION ALL
+                SELECT tipo_pago AS metodo, total AS monto
+                FROM pb WHERE jsonb_array_length(pb.bd) = 0
+            )
+            SELECT metodo AS tipo_pago, COUNT(*) AS total_ventas, COALESCE(SUM(monto), 0) AS monto
+            FROM metodos GROUP BY metodo ORDER BY monto DESC
         ");
         $s->execute($f['params']);
         echo json_encode($s->fetchAll());
