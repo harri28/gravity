@@ -44,7 +44,7 @@ include '../../includes/header.php';
         <i class="fas fa-chair"></i> <?= htmlspecialchars($L_mesa_p) ?>
     </button>
     <button class="tab-btn" id="tab-configuracion" onclick="switchTab('configuracion')">
-        <i class="fas fa-paint-brush"></i> Configuración
+        <i class="fas fa-gear"></i> Configuración
     </button>
     <button class="tab-btn" id="tab-auditoria" onclick="switchTab('auditoria')">
         <i class="fas fa-shield-alt"></i> Auditoría
