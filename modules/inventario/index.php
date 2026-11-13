@@ -140,7 +140,7 @@ include '../../includes/header.php';
             <label class="form-label">Buscar</label>
             <div class="input-group">
                 <span class="input-group-icon"><i class="fas fa-search"></i></span>
-                <input type="text" id="f-q" class="form-control" placeholder="Nombre, código o laboratorio...">
+                <input type="text" id="f-q" class="form-control" placeholder="Nombre, código o marca...">
             </div>
         </div>
         <div class="col-6 col-md-3">
@@ -428,19 +428,19 @@ include '../../includes/header.php';
                             <span class="input-group-icon" title="Escanea el código de barras o escríbelo manualmente">
                                 <i class="fas fa-barcode" style="color:var(--primary)"></i>
                             </span>
-                            <input type="text" id="p-codigo" class="form-control" placeholder="MED001 o escanea el código">
+                            <input type="text" id="p-codigo" class="form-control" placeholder="COD001 o escanea el código">
                         </div>
                     </div>
                     <div class="form-group" style="flex:1;margin-bottom:0">
                         <label class="form-label">SKU <span style="font-size:.78rem;color:var(--text-muted)">(código interno)</span></label>
                         <input type="text" id="p-sku" class="form-control" placeholder="Déjalo vacío para autogenerar">
-                        <small style="color:var(--text-muted);font-size:.7rem">Si lo dejas vacío, el sistema genera uno a partir del nombre (ej. PILSEN CALLAO → PC001).</small>
+                        <small style="color:var(--text-muted);font-size:.7rem">Si lo dejas vacío, el sistema genera uno a partir del nombre (ej. CAMISA AZUL → CA001).</small>
                     </div>
                 </div>
 
                 <div class="form-group" style="margin-bottom:0">
                     <label class="form-label">Nombre <span style="color:var(--danger)">*</span></label>
-                    <input type="text" id="p-nombre" class="form-control" placeholder="Paracetamol 500mg x 10 tab">
+                    <input type="text" id="p-nombre" class="form-control" placeholder="Nombre del producto">
                 </div>
 
                 <div class="form-group" style="margin-bottom:0">
@@ -480,7 +480,7 @@ include '../../includes/header.php';
                 <div style="display:flex;gap:14px">
                     <div class="form-group" style="flex:1;margin-bottom:0">
                         <label class="form-label">Presentación</label>
-                        <input type="text" id="p-presentacion" class="form-control" placeholder="Tabletas x 10">
+                        <input type="text" id="p-presentacion" class="form-control" placeholder="Ej: Caja x 12">
                     </div>
                     <div class="form-group" style="flex:1;margin-bottom:0">
                         <label class="form-label">Fecha de Vencimiento <span style="font-size:.78rem;color:var(--text-muted)">(opcional)</span></label>
@@ -488,14 +488,20 @@ include '../../includes/header.php';
                     </div>
                 </div>
 
-                <div style="display:flex;gap:14px">
-                    <div class="form-group" style="flex:1;margin-bottom:0">
+                <div style="display:flex;gap:14px;align-items:flex-end">
+                    <div class="form-group" style="flex:.9;margin-bottom:0">
                         <label class="form-label">Precio de Compra (S/)</label>
                         <input type="number" id="p-precio-compra" class="form-control" placeholder="0.00" step="0.01" min="0">
                     </div>
-                    <div class="form-group" style="flex:1;margin-bottom:0">
+                    <div class="form-group" style="flex:.9;margin-bottom:0">
                         <label class="form-label">Precio de Venta (S/) <span style="color:var(--danger)">*</span></label>
                         <input type="number" id="p-precio-venta" class="form-control" placeholder="0.00" step="0.01" min="0">
+                    </div>
+                    <div class="form-group" style="flex:1.1;margin-bottom:0">
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.88rem;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2)">
+                            <input type="checkbox" id="p-sin-costo" style="width:16px;height:16px;cursor:pointer" onchange="toggleSinCosto()">
+                            <span>Sin costo (gratis / cortesía)</span>
+                        </label>
                     </div>
                 </div>
 
@@ -546,7 +552,7 @@ include '../../includes/header.php';
                         <div id="nueva-unidad-form" style="display:none;margin-top:8px">
                             <div style="display:flex;gap:6px">
                                 <input type="text" id="nueva-unidad-nombre" class="form-control"
-                                       placeholder="Ej: blíster x 28"
+                                       placeholder="Ej: paquete x 6"
                                        style="flex:1;font-size:.85rem"
                                        onkeydown="if(event.key==='Enter'){event.preventDefault();guardarNuevaUnidad();}
                                                   if(event.key==='Escape'){toggleNuevaUnidad();}">
@@ -584,7 +590,7 @@ include '../../includes/header.php';
                 <div style="display:flex;gap:24px;align-items:center;padding:6px 0">
                     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.88rem">
                         <input type="checkbox" id="p-receta" style="width:16px;height:16px;cursor:pointer">
-                        <span>Requiere receta médica</span>
+                        <span>Requiere autorización especial</span>
                     </label>
                     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.88rem">
                         <input type="checkbox" id="p-favorito" style="width:16px;height:16px;cursor:pointer">
@@ -619,33 +625,33 @@ include '../../includes/header.php';
         </div>
     </div><!-- /card Información de Producto -->
 
-    <!-- ── Card: Información de Medicamentos ── -->
+    <!-- ── Card: Información Adicional ── -->
     <div class="card" style="margin-top:20px">
         <div class="card-header">
             <div class="card-title">
-                <i class="fas fa-pills" style="color:var(--primary);margin-right:8px"></i>Información de Medicamentos
+                <i class="fas fa-circle-info" style="color:var(--primary);margin-right:8px"></i>Información Adicional
             </div>
         </div>
         <div style="padding:20px;display:flex;flex-direction:column;gap:14px">
 
                 <div style="display:flex;gap:14px">
                     <div class="form-group" style="flex:1;margin-bottom:0">
-                        <label class="form-label">Código de Producto DIGEMID</label>
+                        <label class="form-label">Código externo (opcional)</label>
                         <input type="text" id="p-digemid-codigo" class="form-control" placeholder="Ej: 123456">
                     </div>
                     <div class="form-group" style="flex:1;margin-bottom:0">
-                        <label class="form-label">Precio de empaque DIGEMID (S/)</label>
+                        <label class="form-label">Precio de referencia (S/)</label>
                         <input type="number" id="p-digemid-precio" class="form-control" placeholder="0.00" step="0.01" min="0">
                     </div>
                 </div>
 
                 <div style="display:flex;gap:14px">
                     <div class="form-group" style="flex:1;margin-bottom:0">
-                        <label class="form-label">Registro Sanitario</label>
-                        <input type="text" id="p-registro-sanitario" class="form-control" placeholder="Ej: E.F.A. N° 12345">
+                        <label class="form-label">N° de Registro (opcional)</label>
+                        <input type="text" id="p-registro-sanitario" class="form-control" placeholder="Ej: N° 12345">
                     </div>
                     <div class="form-group" style="flex:1;margin-bottom:0">
-                        <label class="form-label">Vencimiento del Registro Sanitario</label>
+                        <label class="form-label">Vencimiento del Registro</label>
                         <input type="date" id="p-vencimiento-registro" class="form-control">
                     </div>
                 </div>
@@ -655,41 +661,41 @@ include '../../includes/header.php';
                         <label class="form-label">Condición de venta</label>
                         <select id="p-condicion-venta" class="form-control">
                             <option value="">— Seleccionar —</option>
-                            <option value="sin_receta">Sin receta médica</option>
-                            <option value="con_receta">Con receta médica</option>
-                            <option value="con_receta_retenida">Con receta médica retenida</option>
+                            <option value="sin_receta">Venta libre</option>
+                            <option value="con_receta">Requiere autorización</option>
+                            <option value="con_receta_retenida">Requiere autorización registrada</option>
                         </select>
                     </div>
                     <div class="form-group" style="flex:1;margin-bottom:0">
-                        <label class="form-label">Principio activo</label>
-                        <input type="text" id="p-principio-activo" class="form-control" placeholder="Ej: Paracetamol">
+                        <label class="form-label">Componente principal</label>
+                        <input type="text" id="p-principio-activo" class="form-control" placeholder="Ej: material / componente">
                     </div>
                 </div>
 
                 <div style="display:flex;gap:14px">
                     <div class="form-group" style="flex:1;margin-bottom:0">
-                        <label class="form-label">Laboratorio</label>
-                        <input type="text" id="p-laboratorio" class="form-control" placeholder="Ej: Bayer">
+                        <label class="form-label">Marca / Fabricante</label>
+                        <input type="text" id="p-laboratorio" class="form-control" placeholder="Ej: nombre de la marca">
                     </div>
                     <div class="form-group" style="flex:1;margin-bottom:0">
-                        <label class="form-label">Concentración</label>
-                        <input type="text" id="p-concentracion" class="form-control" placeholder="Ej: 500mg">
+                        <label class="form-label">Especificación</label>
+                        <input type="text" id="p-concentracion" class="form-control" placeholder="Ej: 500ml, 1kg, talla M">
                     </div>
                 </div>
 
                 <div style="display:flex;gap:14px">
                     <div class="form-group" style="flex:1;margin-bottom:0">
-                        <label class="form-label">Forma farmacéutica</label>
-                        <input type="text" id="p-forma-farmaceutica" class="form-control" placeholder="Ej: Tableta, Jarabe, Ampolla">
+                        <label class="form-label">Tipo / Formato</label>
+                        <input type="text" id="p-forma-farmaceutica" class="form-control" placeholder="Ej: Caja, Bolsa, Botella">
                     </div>
                     <div class="form-group" style="flex:1;margin-bottom:0">
-                        <label class="form-label">Presentación farmacéutica</label>
-                        <input type="text" id="p-presentacion-farmaceutica" class="form-control" placeholder="Ej: Caja x 10 tabletas">
+                        <label class="form-label">Presentación detallada</label>
+                        <input type="text" id="p-presentacion-farmaceutica" class="form-control" placeholder="Ej: Caja x 10 unidades">
                     </div>
                 </div>
 
         </div>
-    </div><!-- /card Información de Medicamentos -->
+    </div><!-- /card Información Adicional -->
 
     <!-- ── Card: Precios por unidad de medida ── -->
     <div class="card" style="margin-top:20px">
@@ -1405,7 +1411,7 @@ function renderPage(page) {
                       style="color:var(--primary);cursor:pointer">${p.nombre}</span>${favIcon}${recetaIcon}
             </td>
             <td>${p.categoria || '<span style="color:var(--text-light)">—</span>'}</td>
-            <td class="text-right" style="font-weight:600;white-space:nowrap;padding-left:32px;min-width:110px">S/ ${parseFloat(p.precio_venta).toFixed(2)}</td>
+            <td class="text-right" style="font-weight:600;white-space:nowrap;padding-left:32px;min-width:110px">${parseFloat(p.precio_venta) === 0 ? '<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:700"><i class="fas fa-gift"></i> GRATIS</span>' : 'S/ ' + parseFloat(p.precio_venta).toFixed(2)}</td>
             <td style="text-align:center;padding-left:32px;min-width:110px;white-space:nowrap">
                 <span style="${stockCls}">${p.stock}</span>
                 ${stockBadge}
@@ -1495,6 +1501,9 @@ function verProducto(producto) {
 
     const boolLabel = v => (v == 't' || v === true) ? 'Sí' : 'No';
     const money = v => 'S/ ' + parseFloat(v || 0).toFixed(2);
+    const precioVentaLabel = parseFloat(producto.precio_venta || 0) === 0
+        ? '<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:700"><i class="fas fa-gift"></i> CORTESÍA</span>'
+        : money(producto.precio_venta);
 
     const campos = [
         ['Código', producto.codigo],
@@ -1504,14 +1513,14 @@ function verProducto(producto) {
         ['Unidad de medida', producto.unidad],
         ['Stock', producto.stock],
         ['Alerta', producto.stock_minimo],
-        ['Precio de venta', money(producto.precio_venta)],
+        ['Precio de venta', precioVentaLabel],
         ['Precio de compra', money(producto.precio_compra)],
-        ['Laboratorio', producto.laboratorio || '—'],
+        ['Marca / Fabricante', producto.laboratorio || '—'],
         ['Presentación', producto.presentacion || '—'],
         ['Afectación IGV', producto.afectacion_igv || '—'],
         ['% IGV', parseFloat(producto.porcentaje_igv || 18).toFixed(2) + '%'],
         ['Incluye IGV', boolLabel(producto.incluye_igv)],
-        ['Requiere receta', boolLabel(producto.requiere_receta)],
+        ['Requiere autorización', boolLabel(producto.requiere_receta)],
         ['Favorito', boolLabel(producto.favorito)],
         ['Fecha de vencimiento', producto.fecha_vencimiento || '—'],
     ];
@@ -1708,6 +1717,9 @@ function openProductoModal(producto = null) {
     }
     document.getElementById('p-precio-compra').value = producto ? parseFloat(producto.precio_compra).toFixed(2) : '';
     document.getElementById('p-precio-venta').value  = producto ? parseFloat(producto.precio_venta).toFixed(2)  : '';
+    const sinCostoChk = document.getElementById('p-sin-costo');
+    sinCostoChk.checked = !!producto && parseFloat(producto.precio_venta || 0) === 0 && parseFloat(producto.precio_compra || 0) === 0;
+    toggleSinCosto();
     document.getElementById('p-stock').value         = producto?.stock         ?? '';
     document.getElementById('p-stock-minimo').value  = producto?.stock_minimo  ?? '5';
     const unidadVal = producto?.unidad ?? 'unidad';
@@ -1743,16 +1755,36 @@ function openProductoModal(producto = null) {
     setTimeout(() => document.getElementById('p-codigo').focus(), 100);
 }
 
+function toggleSinCosto() {
+    const chk = document.getElementById('p-sin-costo');
+    const inpCompra = document.getElementById('p-precio-compra');
+    const inpVenta  = document.getElementById('p-precio-venta');
+    if (chk.checked) {
+        inpCompra.value = '0.00';
+        inpVenta.value  = '0.00';
+        inpCompra.disabled = true;
+        inpVenta.disabled  = true;
+        inpCompra.style.background = 'var(--surface-2)';
+        inpVenta.style.background  = 'var(--surface-2)';
+    } else {
+        inpCompra.disabled = false;
+        inpVenta.disabled  = false;
+        inpCompra.style.background = '';
+        inpVenta.style.background  = '';
+    }
+}
+
 function saveProducto() {
     const codigo      = document.getElementById('p-codigo').value.trim();
     const nombre      = document.getElementById('p-nombre').value.trim();
-    const precio_venta = parseFloat(document.getElementById('p-precio-venta').value);
+    const sinCosto    = document.getElementById('p-sin-costo').checked;
+    const precio_venta = sinCosto ? 0 : parseFloat(document.getElementById('p-precio-venta').value);
     const porcentajeIgvInput = parseFloat(document.getElementById('p-porcentaje-igv').value);
     const porcentajeIgv = isNaN(porcentajeIgvInput) ? 18 : porcentajeIgvInput;
 
     if (!codigo)                 { showToast('El código es requerido', 'error'); return; }
     if (!nombre)                 { showToast('El nombre es requerido', 'error'); return; }
-    if (!precio_venta || precio_venta <= 0) { showToast('El precio de venta debe ser mayor a 0', 'error'); return; }
+    if (!sinCosto && (!precio_venta || precio_venta <= 0)) { showToast('El precio de venta debe ser mayor a 0 (o marca "Sin costo")', 'error'); return; }
 
     const payload = {
         id:              editingId,
@@ -1763,7 +1795,7 @@ function saveProducto() {
 
 
         presentacion:    document.getElementById('p-presentacion').value,
-        precio_compra:   parseFloat(document.getElementById('p-precio-compra').value) || 0,
+        precio_compra:   sinCosto ? 0 : (parseFloat(document.getElementById('p-precio-compra').value) || 0),
         precio_venta,
         stock:           parseInt(document.getElementById('p-stock').value)        || 0,
         stock_minimo:    parseInt(document.getElementById('p-stock-minimo').value) || 5,
