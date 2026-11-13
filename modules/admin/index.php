@@ -41,7 +41,7 @@ include '../../includes/header.php';
         <i class="fas fa-store"></i> Sucursales
     </button>
     <button class="tab-btn" id="tab-mesas" onclick="switchTab('mesas')">
-        <i class="fas fa-chair"></i> <?= htmlspecialchars($L_mesa_p) ?>
+        <i class="fas fa-utensils"></i> <?= htmlspecialchars($L_mesa_p) ?>
     </button>
     <button class="tab-btn" id="tab-configuracion" onclick="switchTab('configuracion')">
         <i class="fas fa-gear"></i> Configuración
@@ -123,7 +123,7 @@ include '../../includes/header.php';
     <div class="card">
         <div class="card-header">
             <div class="card-title">
-                <i class="fas fa-chair" style="color:var(--primary);margin-right:8px"></i><?= htmlspecialchars($L_mesa_p) ?> de la sucursal
+                <i class="fas fa-utensils" style="color:var(--primary);margin-right:8px"></i><?= htmlspecialchars($L_mesa_p) ?> de la sucursal
             </div>
             <div style="margin-left:auto;display:flex;gap:8px">
                 <button class="btn btn-outline btn-sm" onclick="openModalLabels()"
@@ -1244,12 +1244,12 @@ function loadMesas() {
             const Ls = (window.LABELS?.mesa?.s || 'Mesa');
             if (data.error || !Array.isArray(data)) {
                 document.getElementById('tbody-mesas').innerHTML =
-                    `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-chair"></i><br><br>Error al cargar ${Lp}</td></tr>`;
+                    `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-utensils"></i><br><br>Error al cargar ${Lp}</td></tr>`;
                 return;
             }
             if (!data.length) {
                 document.getElementById('tbody-mesas').innerHTML =
-                    `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-chair"></i><br><br>No hay ${Lp} registradas. Crea la primera con "Nueva ${Ls.toLowerCase()}".</td></tr>`;
+                    `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-utensils"></i><br><br>No hay ${Lp} registradas. Crea la primera con "Nueva ${Ls.toLowerCase()}".</td></tr>`;
                 return;
             }
             document.getElementById('tbody-mesas').innerHTML = data.map(m => {
@@ -1278,7 +1278,7 @@ function loadMesas() {
         .catch(() => {
             const Lp = (window.LABELS?.mesa?.p || 'Mesas').toLowerCase();
             document.getElementById('tbody-mesas').innerHTML =
-                `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-chair"></i><br><br>Error al cargar ${Lp}</td></tr>`;
+                `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-light)"><i class="fas fa-utensils"></i><br><br>Error al cargar ${Lp}</td></tr>`;
             showToast(`Error al cargar ${Lp}`, 'error');
         });
 }
