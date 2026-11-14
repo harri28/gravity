@@ -290,15 +290,6 @@ include '../../includes/header.php';
             </div>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-outline btn-sm" onclick="printReceipt(document.getElementById('ticket-body').innerHTML)">
-                <i class="fas fa-print"></i> Imprimir
-            </button>
-            <button class="btn btn-outline btn-sm" onclick="enviarWhatsApp()" style="border-color:#25d366;color:#25d366">
-                <i class="fab fa-whatsapp"></i> WhatsApp
-            </button>
-            <button class="btn btn-outline btn-sm" onclick="copiarEnlaceComprobante()">
-                <i class="fas fa-link"></i> Copiar enlace de comprobante
-            </button>
             <button class="btn btn-primary" onclick="closeModal('modal-ticket');resetPOS()">
                 <i class="fas fa-plus"></i> Nueva Venta
             </button>
@@ -318,14 +309,11 @@ include '../../includes/header.php';
                 <div id="ticket-body-historial"></div>
             </div>
         </div>
-        <div class="modal-footer">
-            <button class="btn btn-outline btn-sm" onclick="printReceipt(document.getElementById('ticket-body-historial').innerHTML)">
+        <div class="modal-footer" style="justify-content:center">
+            <button class="btn btn-outline btn-sm" style="flex:1;max-width:160px;justify-content:center" onclick="printReceipt(document.getElementById('ticket-body-historial').innerHTML)">
                 <i class="fas fa-print"></i> Imprimir
             </button>
-            <button class="btn btn-outline btn-sm" onclick="enviarWhatsApp()" style="border-color:#25d366;color:#25d366">
-                <i class="fab fa-whatsapp"></i> WhatsApp
-            </button>
-            <button class="btn btn-outline btn-sm" onclick="copiarEnlaceComprobante()">
+            <button class="btn btn-outline btn-sm" style="flex:1;max-width:160px;justify-content:center" onclick="copiarEnlaceComprobante()">
                 <i class="fas fa-link"></i> Copiar enlace
             </button>
         </div>
@@ -2047,7 +2035,7 @@ function buildTicketHTML(opts) {
         tipo_comprobante = 'ticket', numero_venta = null,
         numero_comprobante = null, cliente = null,
         payment_breakdown = [], cuotas = [],
-        fecha = '', hora = '', preview = false, comprobante_url = ''
+        fecha = '', hora = '', preview = false, comprobante_url = '', por_consumo = false
     } = opts;
 
     const PAGOS = { efectivo:'Efectivo', credito:'Crédito', yape:'Yape', plin:'Plin', tarjeta:'Visa/Mastercard', transferencia:'Transferencia' };
@@ -2126,7 +2114,7 @@ function buildTicketHTML(opts) {
             <span>DESCRIPCIÓN</span><span>TOTAL</span>
         </div>
         ${sep()}
-        <div style="margin-bottom:4px">${itemsHTML}</div>
+        <div style="margin-bottom:4px">${por_consumo ? `<div style="display:flex;justify-content:space-between;font-size:9pt"><span style="flex:1;padding-right:6px">CONSUMO</span><span style="white-space:nowrap;font-weight:600">S/${total.toFixed(2)}</span></div>` : itemsHTML}</div>
         ${sep()}
 
         <div style="font-size:9pt;margin:4px 0">
@@ -2176,7 +2164,7 @@ function buildTicketA4HTML(opts) {
         tipo_comprobante = 'ticket', numero_venta = null,
         numero_comprobante = null, cliente = null,
         payment_breakdown = [], cuotas = [],
-        fecha = '', hora = '', preview = false, comprobante_url = ''
+        fecha = '', hora = '', preview = false, comprobante_url = '', por_consumo = false
     } = opts;
 
     const PAGOS = { efectivo:'Efectivo', credito:'Crédito', yape:'Yape', plin:'Plin', tarjeta:'Visa/Mastercard', transferencia:'Transferencia' };
@@ -2260,7 +2248,7 @@ function buildTicketA4HTML(opts) {
                     <th style="background:#f3f4f6;padding:8px 10px;text-align:right;border-bottom:1.5px solid #d1d5db;width:15%">Subtotal</th>
                 </tr>
             </thead>
-            <tbody>${itemsHTML}</tbody>
+            <tbody>${por_consumo ? `<tr><td style="padding:8px 10px;border-bottom:1px solid #e5e7eb">1</td><td style="padding:8px 10px;border-bottom:1px solid #e5e7eb">CONSUMO</td><td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right">1</td><td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right">S/ ${total.toFixed(2)}</td><td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right">S/ ${total.toFixed(2)}</td></tr>` : itemsHTML}</tbody>
         </table>
 
         <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
@@ -2379,6 +2367,7 @@ function previsualizarComprobante() {
         cuotas:           creditRows,
         fecha, hora,
         preview: true,
+        por_consumo: porConsumoActivo,
     });
 
     document.getElementById('preview-ticket-body').innerHTML = html;
@@ -2585,6 +2574,7 @@ function showTicket(data) {
         cuotas:            data.cuotas || [],
         fecha, hora,
         preview: false,
+        por_consumo:       (data.por_consumo === true || data.por_consumo === 't') || porConsumoActivo,
         comprobante_url:   buildComprobanteUrl(data.comprobante_token),
     });
 
@@ -2956,6 +2946,7 @@ function verTicketVenta(id) {
                 cuotas: cuotasData,
                 fecha, hora,
                 preview: false,
+                por_consumo: (data.por_consumo === true || data.por_consumo === 't'),
                 comprobante_url: comprobanteUrl,
             });
 

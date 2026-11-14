@@ -566,27 +566,12 @@ include '../../includes/header.php';
                 </div>
             </div>
 
-            <div class="form-group" style="margin-top:4px">
-                <label style="display:flex;align-items:center;gap:10px;font-weight:600;cursor:pointer">
-                    <input type="checkbox" id="cfg-tax-enabled" checked>
-                    La empresa factura con IGV
-                </label>
-                <small style="color:var(--text-muted);font-size:.76rem">
-                    Si tu precio ya incluye IGV, mantenlo activado.
-                </small>
-            </div>
-
-            <div class="form-group" style="margin-top:4px">
-                <label style="display:flex;align-items:center;gap:10px;font-weight:600;cursor:pointer">
-                    <input type="checkbox" id="cfg-igv-exonerado">
-                    Empresa exonerada de IGV (Ley de Amazonía - Región Selva)
-                </label>
-                <small style="color:var(--text-muted);font-size:.76rem">
-                    Actívalo solo si el local está en la Región Selva (Ley 27037). Al activarlo, TODOS los
-                    productos existentes en TODAS las sucursales de esta empresa se marcan de inmediato como
-                    Exonerado de IGV. Desactivarlo no revierte los productos ya marcados.
-                </small>
-            </div>
+            <!-- Config de IGV a nivel empresa (factura con IGV / exonerada Selva): oculta de la UI por
+                 redundante con la configuracion de IGV por producto, que es la que vale. Se conservan como
+                 hidden para NO perder el valor ya guardado al guardar la configuracion (el backend lo sigue
+                 leyendo y el JS de cargar/guardar sigue funcionando igual). -->
+            <input type="hidden" id="cfg-tax-enabled">
+            <input type="hidden" id="cfg-igv-exonerado">
 
             <div style="font-size:.82rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04rem;margin:22px 0 14px">
                 Sistema e identidad visual
