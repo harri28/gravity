@@ -122,6 +122,16 @@ include '../../includes/header.php';
                 <span class="cart-count" id="cart-count">0</span>
             </div>
 
+            <style>
+                #cart-items.por-consumo-dim .cart-item { opacity:.5; }
+                #btn-por-consumo.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+            </style>
+            <div style="padding:8px 12px;border-bottom:1px solid var(--border)">
+                <button type="button" id="btn-por-consumo" class="btn btn-outline btn-sm" onclick="togglePorConsumo()" style="width:100%;font-size:.78rem;display:flex;align-items:center;justify-content:center;gap:6px" title="Oculta el detalle de productos en el comprobante (se registra como CONSUMO). El historial conserva el detalle.">
+                    <i class="fas fa-eye-slash"></i> Por consumo
+                </button>
+            </div>
+
             <div class='cart-items' id="cart-items">
                 <div class="cart-empty" id="cart-empty">
                     <i class="fas fa-shopping-basket"></i>
@@ -901,6 +911,23 @@ function closeCartDrawer() {
     document.getElementById('cart-drawer-backdrop').classList.remove('active');
 }
 
+let porConsumoActivo = false;
+function togglePorConsumo() {
+    porConsumoActivo = !porConsumoActivo;
+    aplicarPorConsumoUI();
+}
+function aplicarPorConsumoUI() {
+    const itemsEl = document.getElementById('cart-items');
+    const btn = document.getElementById('btn-por-consumo');
+    if (itemsEl) itemsEl.classList.toggle('por-consumo-dim', porConsumoActivo);
+    if (btn) {
+        btn.classList.toggle('active', porConsumoActivo);
+        btn.innerHTML = porConsumoActivo
+            ? '<i class="fas fa-eye-slash"></i> Por consumo (activo)'
+            : '<i class="fas fa-eye-slash"></i> Por consumo';
+    }
+}
+
 function renderCart() {
     const itemsEl   = document.getElementById('cart-items');
     const emptyEl   = document.getElementById('cart-empty');
@@ -952,6 +979,8 @@ function renderCart() {
             </div>`;
         itemsEl.insertBefore(div, emptyEl);
     });
+
+    aplicarPorConsumoUI();
 
     const totals = computeCartTotals();
     const descuento  = (document.getElementById('modal-cobro')?.classList.contains('open'))
@@ -2490,6 +2519,7 @@ function confirmarVenta() {
 
     const payload = {
         items: cart.map(i => ({ producto_id: i.id, cantidad: i.qty, precio: parseFloat(i.product.precio_venta), unidad_medida: i.unidadMedida || null })),
+        por_consumo: porConsumoActivo,
         cliente_id: selectedCliente ? selectedCliente.id : null,
         tipo_pago: tipoPago,
         tipo_comprobante: tipoComp,
@@ -2623,6 +2653,7 @@ function resetPOS() {
     creditPaymentEnabled = false;
     creditPaymentRows = [];
     setToggleState('check-credito', 'track-credito', false);
+    porConsumoActivo = false;
     renderCart();
     renderSplitPaymentPanel();
     document.getElementById('search-input').value = '';

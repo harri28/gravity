@@ -144,6 +144,7 @@ CREATE TABLE IF NOT EXISTS ventas (
     total            DECIMAL(10,2) NOT NULL,
     tipo_pago        VARCHAR(30)   DEFAULT 'efectivo',
     tipo_comprobante VARCHAR(20)   DEFAULT 'boleta',
+    por_consumo      BOOLEAN       NOT NULL DEFAULT FALSE,
     estado           VARCHAR(20)   DEFAULT 'completada',
     observaciones    TEXT,
     motivo_anulacion TEXT,
