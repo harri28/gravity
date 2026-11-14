@@ -497,18 +497,12 @@ include '../../includes/header.php';
                         <label class="form-label">Precio de Venta (S/) <span style="color:var(--danger)">*</span></label>
                         <input type="number" id="p-precio-venta" class="form-control" placeholder="0.00" step="0.01" min="0">
                     </div>
-                    <div class="form-group" style="flex:1.1;margin-bottom:0">
-                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.88rem;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2)">
-                            <input type="checkbox" id="p-sin-costo" style="width:16px;height:16px;cursor:pointer" onchange="toggleSinCosto()">
-                            <span>Sin costo (gratis / cortesía)</span>
-                        </label>
-                    </div>
                 </div>
 
                 <div style="display:flex;gap:14px">
                     <div class="form-group" id="stock-inicial-group" style="flex:1;margin-bottom:0">
                         <label class="form-label">Stock</label>
-                        <input type="number" id="p-stock" class="form-control" placeholder="0" min="0">
+                        <input type="number" id="p-stock" class="form-control" placeholder="0" min="0" step="1">
                     </div>
                     <div class="form-group" style="flex:1;margin-bottom:0">
                         <label class="form-label">Alerta de Stock</label>
@@ -743,7 +737,6 @@ include '../../includes/header.php';
                     <thead>
                         <tr>
                             <th>Unidad de medida</th>
-                            <th>Abreviación</th>
                             <th class="text-right" style="width:110px">Cantidad</th>
                             <th class="text-right" style="width:120px">Precio (S/)</th>
                             <th style="width:40px"></th>
@@ -751,7 +744,7 @@ include '../../includes/header.php';
                     </thead>
                     <tbody id="precios-unidad-body">
                         <tr id="precios-unidad-empty">
-                            <td colspan="5" style="text-align:center;padding:20px;color:var(--text-light)">
+                            <td colspan="4" style="text-align:center;padding:20px;color:var(--text-light)">
                                 Sin precios por unidad de medida configurados
                             </td>
                         </tr>
@@ -1540,7 +1533,7 @@ function verProducto(producto) {
             puWrap.style.display = '';
             document.getElementById('pv-precios-unidad').innerHTML = data.map(p => `
                 <div style="display:flex;gap:6px;padding:3px 0">
-                    <span style="font-weight:400;font-size:.85rem">${p.unidad_medida}${p.abreviacion ? ' (' + p.abreviacion + ')' : ''} x${p.cantidad}:</span>
+                    <span style="font-weight:400;font-size:.85rem">${p.unidad_medida} x${p.cantidad}:</span>
                     <span style="font-weight:400;font-size:.85rem">S/ ${parseFloat(p.precio_venta).toFixed(2)}</span>
                 </div>`).join('');
         })
@@ -1604,7 +1597,7 @@ function agregarPrecioUnidad() {
         return;
     }
 
-    preciosUnidadEditando.push({ unidad_medida: unidad, abreviacion: '', cantidad: '', precio_venta: '' });
+    preciosUnidadEditando.push({ unidad_medida: unidad, cantidad: '', precio_venta: '' });
     renderPreciosUnidadEditor();
     select.value = '';
 }
@@ -1634,11 +1627,6 @@ function renderPreciosUnidadEditor() {
         tr.className = 'precio-unidad-row';
         tr.innerHTML = `
             <td style="font-weight:600">${p.unidad_medida}</td>
-            <td>
-                <input type="text" value="${p.abreviacion ?? ''}" placeholder="Ej: BLS"
-                    style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:.85rem"
-                    oninput="actualizarPrecioUnidad(${idx}, 'abreviacion', this.value)">
-            </td>
             <td class="text-right">
                 <input type="number" value="${p.cantidad ?? ''}" min="1" placeholder="0"
                     style="width:90px;text-align:right;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:.85rem"
@@ -1717,10 +1705,7 @@ function openProductoModal(producto = null) {
     }
     document.getElementById('p-precio-compra').value = producto ? parseFloat(producto.precio_compra).toFixed(2) : '';
     document.getElementById('p-precio-venta').value  = producto ? parseFloat(producto.precio_venta).toFixed(2)  : '';
-    const sinCostoChk = document.getElementById('p-sin-costo');
-    sinCostoChk.checked = !!producto && parseFloat(producto.precio_venta || 0) === 0 && parseFloat(producto.precio_compra || 0) === 0;
-    toggleSinCosto();
-    document.getElementById('p-stock').value         = producto?.stock         ?? '';
+    document.getElementById('p-stock').value         = producto?.stock != null ? parseInt(producto.stock, 10) : '';
     document.getElementById('p-stock-minimo').value  = producto?.stock_minimo  ?? '5';
     const unidadVal = producto?.unidad ?? 'unidad';
     if (typeof window.jQuery !== 'undefined' && typeof window.jQuery.fn.select2 !== 'undefined') {
@@ -1755,36 +1740,16 @@ function openProductoModal(producto = null) {
     setTimeout(() => document.getElementById('p-codigo').focus(), 100);
 }
 
-function toggleSinCosto() {
-    const chk = document.getElementById('p-sin-costo');
-    const inpCompra = document.getElementById('p-precio-compra');
-    const inpVenta  = document.getElementById('p-precio-venta');
-    if (chk.checked) {
-        inpCompra.value = '0.00';
-        inpVenta.value  = '0.00';
-        inpCompra.disabled = true;
-        inpVenta.disabled  = true;
-        inpCompra.style.background = 'var(--surface-2)';
-        inpVenta.style.background  = 'var(--surface-2)';
-    } else {
-        inpCompra.disabled = false;
-        inpVenta.disabled  = false;
-        inpCompra.style.background = '';
-        inpVenta.style.background  = '';
-    }
-}
-
 function saveProducto() {
     const codigo      = document.getElementById('p-codigo').value.trim();
     const nombre      = document.getElementById('p-nombre').value.trim();
-    const sinCosto    = document.getElementById('p-sin-costo').checked;
-    const precio_venta = sinCosto ? 0 : parseFloat(document.getElementById('p-precio-venta').value);
+    const precio_venta = parseFloat(document.getElementById('p-precio-venta').value);
     const porcentajeIgvInput = parseFloat(document.getElementById('p-porcentaje-igv').value);
     const porcentajeIgv = isNaN(porcentajeIgvInput) ? 18 : porcentajeIgvInput;
 
     if (!codigo)                 { showToast('El código es requerido', 'error'); return; }
     if (!nombre)                 { showToast('El nombre es requerido', 'error'); return; }
-    if (!sinCosto && (!precio_venta || precio_venta <= 0)) { showToast('El precio de venta debe ser mayor a 0 (o marca "Sin costo")', 'error'); return; }
+    if (!precio_venta || precio_venta <= 0) { showToast('El precio de venta debe ser mayor a 0', 'error'); return; }
 
     const payload = {
         id:              editingId,
@@ -1795,7 +1760,7 @@ function saveProducto() {
 
 
         presentacion:    document.getElementById('p-presentacion').value,
-        precio_compra:   sinCosto ? 0 : (parseFloat(document.getElementById('p-precio-compra').value) || 0),
+        precio_compra:   parseFloat(document.getElementById('p-precio-compra').value) || 0,
         precio_venta,
         stock:           parseInt(document.getElementById('p-stock').value)        || 0,
         stock_minimo:    parseInt(document.getElementById('p-stock-minimo').value) || 5,
@@ -1807,12 +1772,11 @@ function saveProducto() {
         favorito:           document.getElementById('p-favorito').checked,
         fecha_vencimiento:  document.getElementById('p-fecha-vencimiento').value || null,
         precios_unidad: preciosUnidadEditando
-            .filter(p => (p.unidad_medida || '').trim() && parseInt(p.cantidad) > 0 && parseFloat(p.precio_venta) > 0)
+            .filter(p => (p.unidad_medida || '').trim() && parseInt(p.cantidad) > 0)
             .map(p => ({
                 unidad_medida: p.unidad_medida.trim(),
-                abreviacion: (p.abreviacion || '').trim(),
                 cantidad: parseInt(p.cantidad),
-                precio_venta: parseFloat(p.precio_venta),
+                precio_venta: parseFloat(p.precio_venta) || 0,
             })),
     };
 

@@ -474,6 +474,7 @@ const GRID_LIMIT = 20;
 let cart = [];
 let selectedCliente = null;
 let defaultCliente = null;
+let _cortesiaPendiente = null;
 let currentCat = 0;
 let currentVentaData = null;
 let _lastSale = null;
@@ -812,7 +813,14 @@ function seleccionarUnidadMedida(unidadMedida) {
     }
     const presentacion = _presentacionesActuales.find(p => p.unidad_medida === unidadMedida);
     if (!presentacion) return;
-    agregarAlCarritoConUnidad(product, presentacion, parseFloat(presentacion.cantidad) || 1);
+    const factorCortesia = parseFloat(presentacion.cantidad) || 1;
+    if (parseFloat(presentacion.precio_venta) === 0) {
+        // Cortesía (S/ 0.00): exige registrar al cliente ANTES de agregar la línea gratis.
+        openModalNuevoCliente();
+        _cortesiaPendiente = { product, presentacion, factor: factorCortesia };
+        return;
+    }
+    agregarAlCarritoConUnidad(product, presentacion, factorCortesia);
 }
 
 function agregarAlCarritoConUnidad(product, presentacion, factor) {
@@ -2628,6 +2636,7 @@ function setupBarcodeScanner() {
 
 // ---- Nuevo Cliente ----
 function openModalNuevoCliente() {
+    _cortesiaPendiente = null;
     ['nc-numero-documento','nc-nombres','nc-apellidos','nc-telefono','nc-email','nc-direccion','nc-ubigeo']
         .forEach(id => {
             const el = document.getElementById(id);
@@ -2691,6 +2700,14 @@ async function guardarNuevoCliente() {
 
         closeModal('modal-nuevo-cliente');
         showToast('Cliente guardado y seleccionado', 'success');
+
+        // Si venía de seleccionar una cortesía (S/ 0.00), ahora que hay cliente
+        // registrado, agrega la línea gratis al carrito.
+        if (_cortesiaPendiente) {
+            const c = _cortesiaPendiente;
+            _cortesiaPendiente = null;
+            agregarAlCarritoConUnidad(c.product, c.presentacion, c.factor);
+        }
     } catch (error) {
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-save"></i> Guardar Cliente';

@@ -78,7 +78,7 @@ function guardarPreciosUnidadProducto(PDO $db, int $productoId, array $precios):
         $unidad = trim($p['unidad_medida'] ?? '');
         $cantidad = intval($p['cantidad'] ?? 0);
         $precio = floatval($p['precio_venta'] ?? 0);
-        if ($unidad === '' || $cantidad <= 0 || $precio <= 0) {
+        if ($unidad === '' || $cantidad <= 0 || $precio < 0) {
             continue;
         }
         $stmt->execute([
