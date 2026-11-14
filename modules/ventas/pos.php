@@ -817,6 +817,8 @@ function seleccionarUnidadMedida(unidadMedida) {
     if (parseFloat(presentacion.precio_venta) === 0) {
         // Cortesía (S/ 0.00): exige registrar al cliente ANTES de agregar la línea gratis.
         openModalNuevoCliente();
+        const motivoCortesia = document.getElementById('nc-motivo');
+        if (motivoCortesia) { motivoCortesia.value = 'cumpleanos'; actualizarMotivoNuevoCliente(); }
         _cortesiaPendiente = { product, presentacion, factor: factorCortesia };
         return;
     }
@@ -1124,6 +1126,23 @@ function bootstrapPosClienteUI() {
                 <div class="cliente-form-group">
                     <label>Direccion</label>
                     <textarea id="nc-direccion" placeholder="Direccion del cliente"></textarea>
+                </div>
+            </div>
+            <div class="cliente-form-grid c2" style="margin-top:14px">
+                <div class="cliente-form-group">
+                    <label>Motivo</label>
+                    <select id="nc-motivo" onchange="actualizarMotivoNuevoCliente()">
+                        <option value="">— Ninguno —</option>
+                        <option value="cumpleanos">Cumpleaños</option>
+                        <option value="cortesia">Cortesía</option>
+                        <option value="promocion">Promoción</option>
+                        <option value="otro">Otro</option>
+                    </select>
+                </div>
+                <div class="cliente-form-group" id="nc-grupo-fecha-nac" style="display:none">
+                    <label>Fecha de nacimiento</label>
+                    <input type="date" id="nc-fecha-nacimiento" onchange="actualizarEdadNuevoCliente()">
+                    <div class="cliente-lookup-note" id="nc-edad-note"></div>
                 </div>
             </div>
             <div class="cliente-ubigeo-box" id="nc-ubigeo-info">Sin ubigeo consultado.</div>
@@ -1903,7 +1922,8 @@ function procesarVenta() {
     document.getElementById('monto-recibido').value          = totalFinal.toFixed(2); // display readonly
     document.getElementById('monto-cliente').value           = totalFinal.toFixed(2); // por defecto, pago exacto
     document.getElementById('tipo-pago').value               = 'efectivo';
-    document.getElementById('tipo-comprobante').value        = 'boleta';
+    const hayCortesia = cart.some(i => parseFloat(i.product?.precio_venta || 0) === 0);
+    document.getElementById('tipo-comprobante').value        = hayCortesia ? 'ticket' : 'boleta';
     document.getElementById('cobro-observacion').value       = '';
     splitPaymentEnabled = false;
     splitPaymentRows = [];
@@ -1958,6 +1978,12 @@ function onComprobanteChange() {
             ? ticketSerie.serie + String(parseInt(ticketSerie.ultimo_numero || 0, 10) + 1).padStart(4, '0')
             : 'TK';
         serieEl.innerHTML = `<option value="TK">${label}</option>`;
+    }
+    const btnConfirmar = document.getElementById('btn-confirmar-venta');
+    if (btnConfirmar) {
+        btnConfirmar.innerHTML = tipo === 'ticket'
+            ? '<i class="fas fa-print"></i> Imprimir'
+            : '<i class="fas fa-check"></i> Pagar y emitir comprobante';
     }
 }
 
@@ -2485,7 +2511,9 @@ function confirmarVenta() {
     .then(r => r.json())
     .then(data => {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-check"></i> Pagar y emitir comprobante';
+        btn.innerHTML = document.getElementById('tipo-comprobante').value === 'ticket'
+            ? '<i class="fas fa-print"></i> Imprimir'
+            : '<i class="fas fa-check"></i> Pagar y emitir comprobante';
         if (data.error) { showToast(data.message, 'error'); return; }
         updateProductUsage(cart.map(i => i.id));
         closeModal('modal-cobro');
@@ -2495,7 +2523,9 @@ function confirmarVenta() {
     })
     .catch(() => {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-check"></i> Pagar y emitir comprobante';
+        btn.innerHTML = document.getElementById('tipo-comprobante').value === 'ticket'
+            ? '<i class="fas fa-print"></i> Imprimir'
+            : '<i class="fas fa-check"></i> Pagar y emitir comprobante';
         showToast('Error al procesar la venta', 'error');
     });
 }
@@ -2635,13 +2665,41 @@ function setupBarcodeScanner() {
 }
 
 // ---- Nuevo Cliente ----
+function calcularEdadDesde(fechaStr) {
+    if (!fechaStr) return null;
+    const nac = new Date(fechaStr + 'T00:00:00');
+    if (isNaN(nac.getTime())) return null;
+    const hoy = new Date();
+    let edad = hoy.getFullYear() - nac.getFullYear();
+    const m = hoy.getMonth() - nac.getMonth();
+    if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) edad--;
+    return edad;
+}
+
+function actualizarEdadNuevoCliente() {
+    const note = document.getElementById('nc-edad-note');
+    if (!note) return;
+    const edad = calcularEdadDesde(document.getElementById('nc-fecha-nacimiento')?.value || '');
+    note.textContent = (edad !== null && edad >= 0) ? (edad + ' años 🎉') : '';
+}
+
+function actualizarMotivoNuevoCliente() {
+    const motivo = document.getElementById('nc-motivo')?.value || '';
+    const grupo = document.getElementById('nc-grupo-fecha-nac');
+    if (grupo) grupo.style.display = motivo === 'cumpleanos' ? '' : 'none';
+    actualizarEdadNuevoCliente();
+}
+
 function openModalNuevoCliente() {
     _cortesiaPendiente = null;
-    ['nc-numero-documento','nc-nombres','nc-apellidos','nc-telefono','nc-email','nc-direccion','nc-ubigeo']
+    ['nc-numero-documento','nc-nombres','nc-apellidos','nc-telefono','nc-email','nc-direccion','nc-ubigeo','nc-fecha-nacimiento']
         .forEach(id => {
             const el = document.getElementById(id);
             if (el) el.value = '';
         });
+    const motivoSel = document.getElementById('nc-motivo');
+    if (motivoSel) motivoSel.value = '';
+    actualizarMotivoNuevoCliente();
     const select = document.getElementById('nc-tipo-documento');
     if (select && tiposDocumentoCliente.length) {
         const predeterminado = tiposDocumentoCliente.find(item => item.codigo === '1') || tiposDocumentoCliente[0];
@@ -2667,10 +2725,17 @@ async function guardarNuevoCliente() {
         email: document.getElementById('nc-email')?.value.trim() || '',
         direccion: document.getElementById('nc-direccion')?.value.trim() || '',
         ubigeo: document.getElementById('nc-ubigeo')?.value.trim() || '',
+        fecha_nacimiento: document.getElementById('nc-fecha-nacimiento')?.value || '',
+        motivo: document.getElementById('nc-motivo')?.value || '',
     };
 
     if (!payload.tipo_documento_id) {
         showToast('Debes seleccionar un tipo de documento', 'error');
+        return;
+    }
+
+    if (payload.motivo === 'cumpleanos' && !payload.fecha_nacimiento) {
+        showToast('Ingresa la fecha de nacimiento del cumpleañero', 'error');
         return;
     }
 

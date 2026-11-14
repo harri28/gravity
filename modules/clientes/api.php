@@ -120,6 +120,8 @@ function construirPayloadCliente(array $input, array $tipoDocumento): array
     $email = trim((string) ($input['email'] ?? ''));
     $direccion = trim((string) ($input['direccion'] ?? ''));
     $ubigeo = trim((string) ($input['ubigeo'] ?? ''));
+    $fechaNacimiento = trim((string) ($input['fecha_nacimiento'] ?? ''));
+    $motivo = trim((string) ($input['motivo'] ?? ''));
 
     if ($codigo === '6') {
         $apellidos = '';
@@ -149,6 +151,8 @@ function construirPayloadCliente(array $input, array $tipoDocumento): array
         'direccion' => $direccion !== '' ? $direccion : null,
         'codigo_pais' => 'PE',
         'ubigeo' => preg_match('/^\d{6}$/', $ubigeo) ? $ubigeo : null,
+        'fecha_nacimiento' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaNacimiento) ? $fechaNacimiento : null,
+        'motivo' => in_array($motivo, ['cumpleanos', 'cortesia', 'promocion', 'otro'], true) ? $motivo : null,
     ];
 }
 
@@ -272,6 +276,8 @@ switch ($action) {
                     c.nombre_completo,
                     c.razon_social,
                     c.ubigeo,
+                    c.fecha_nacimiento,
+                    c.motivo,
                     td.descripcion_documento,
                     COUNT(v.id) FILTER (WHERE v.estado = 'completada') AS total_compras,
                     COALESCE(SUM(v.total) FILTER (WHERE v.estado = 'completada'), 0) AS total_gastado,
@@ -376,7 +382,9 @@ switch ($action) {
                         nombre_completo = :nombre_completo,
                         razon_social = :razon_social,
                         codigo_pais = :codigo_pais,
-                        ubigeo = :ubigeo
+                        ubigeo = :ubigeo,
+                        fecha_nacimiento = COALESCE(CAST(:fecha_nacimiento AS date), fecha_nacimiento),
+                        motivo = COALESCE(:motivo, motivo)
                     WHERE id = :id
                 ");
                 $stmt->execute([
@@ -395,6 +403,8 @@ switch ($action) {
                     ':razon_social' => $payload['razon_social'],
                     ':codigo_pais' => $payload['codigo_pais'],
                     ':ubigeo' => $payload['ubigeo'],
+                    ':fecha_nacimiento' => $payload['fecha_nacimiento'],
+                    ':motivo' => $payload['motivo'],
                 ]);
 
                 jsonResponse(['error' => false, 'message' => 'Cliente actualizado correctamente']);
@@ -404,11 +414,13 @@ switch ($action) {
                 INSERT INTO clientes (
                     nombres, apellidos, dni, ruc, telefono, email, direccion, activo,
                     tipo_documento_id, tipo_documento_codigo, numero_documento,
-                    nombre_completo, razon_social, codigo_pais, ubigeo
+                    nombre_completo, razon_social, codigo_pais, ubigeo,
+                    fecha_nacimiento, motivo
                 ) VALUES (
                     :nombres, :apellidos, :dni, :ruc, :telefono, :email, :direccion, TRUE,
                     :tipo_documento_id, :tipo_documento_codigo, :numero_documento,
-                    :nombre_completo, :razon_social, :codigo_pais, :ubigeo
+                    :nombre_completo, :razon_social, :codigo_pais, :ubigeo,
+                    :fecha_nacimiento, :motivo
                 )
                 RETURNING id
             ");
@@ -427,6 +439,8 @@ switch ($action) {
                 ':razon_social' => $payload['razon_social'],
                 ':codigo_pais' => $payload['codigo_pais'],
                 ':ubigeo' => $payload['ubigeo'],
+                ':fecha_nacimiento' => $payload['fecha_nacimiento'],
+                ':motivo' => $payload['motivo'],
             ]);
 
             jsonResponse([

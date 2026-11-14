@@ -160,12 +160,13 @@ include '../../includes/header.php';
                 <th>Contacto</th>
                 <th style="text-align:center">Compras</th>
                 <th style="text-align:right">Total gastado</th>
+                <th>Motivo</th>
                 <th>Ultima compra</th>
                 <th></th>
             </tr>
         </thead>
         <tbody id="tbodyClientes">
-            <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)"><i class="fas fa-spinner fa-spin"></i> Cargando...</td></tr>
+            <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)"><i class="fas fa-spinner fa-spin"></i> Cargando...</td></tr>
         </tbody>
     </table>
 </div>
@@ -614,7 +615,7 @@ function debouncarBusqueda() {
 
 async function cargarClientes() {
     const tbody = document.getElementById('tbodyClientes');
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)"><i class="fas fa-spinner fa-spin"></i></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)"><i class="fas fa-spinner fa-spin"></i></td></tr>';
     const q = document.getElementById('inputBuscar').value.trim();
 
     try {
@@ -622,7 +623,7 @@ async function cargarClientes() {
         const data = await r.json();
 
         if (data.error) {
-            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:#dc2626">${esc(data.message)}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:#dc2626">${esc(data.message)}</td></tr>`;
             return;
         }
 
@@ -632,14 +633,14 @@ async function cargarClientes() {
         if (!clientesCache.length) {
             const sinFiltro = !q;
             tbody.innerHTML = sinFiltro
-                ? `<tr><td colspan="7">
+                ? `<tr><td colspan="8">
                     <div class="empty-state">
                         <i class="fas fa-users"></i>
                         <div>No hay clientes registrados</div>
                         <a onclick="abrirModal()" style="font-size:inherit;color:var(--primary);text-decoration:underline;cursor:pointer">Agregar clientes</a>
                     </div>
                   </td></tr>`
-                : '<tr><td colspan="7"><div class="empty-state"><i class="fas fa-search"></i>No se encontraron clientes con ese criterio</div></td></tr>';
+                : '<tr><td colspan="8"><div class="empty-state"><i class="fas fa-search"></i>No se encontraron clientes con ese criterio</div></td></tr>';
             return;
         }
 
@@ -670,6 +671,7 @@ async function cargarClientes() {
                     </td>
                     <td style="text-align:center;font-weight:600">${c.total_compras ?? 0}</td>
                     <td style="text-align:right;font-weight:600">S/ ${parseFloat(c.total_gastado || 0).toFixed(2)}</td>
+                    <td style="font-size:.82rem">${motivoClienteBadge(c)}</td>
                     <td style="font-size:.8rem;color:var(--text-muted)">${c.ultima_compra ? fmtDate(c.ultima_compra) : '-'}</td>
                     <td>
                         <div style="display:flex;gap:5px;justify-content:flex-end">
@@ -681,7 +683,7 @@ async function cargarClientes() {
             `;
         }).join('');
     } catch (e) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#dc2626">Error al cargar clientes</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:#dc2626">Error al cargar clientes</td></tr>';
     }
 }
 
@@ -944,6 +946,29 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
         }
     });
 });
+
+function calcularEdadCliente(fechaStr) {
+    if (!fechaStr) return null;
+    const nac = new Date(String(fechaStr).slice(0, 10) + 'T00:00:00');
+    if (isNaN(nac.getTime())) return null;
+    const hoy = new Date();
+    let edad = hoy.getFullYear() - nac.getFullYear();
+    const m = hoy.getMonth() - nac.getMonth();
+    if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) edad--;
+    return edad;
+}
+
+function motivoClienteBadge(c) {
+    const motivo = (c.motivo || '').trim();
+    if (!motivo) return '<span style="color:var(--text-muted)">-</span>';
+    if (motivo === 'cumpleanos') {
+        const edad = calcularEdadCliente(c.fecha_nacimiento);
+        const txt = (edad !== null && edad >= 0) ? `${edad} años 🎉` : 'Cumpleaños 🎉';
+        return `<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap">${txt}</span>`;
+    }
+    const labels = { cortesia: 'Cortesía', promocion: 'Promoción', otro: 'Otro' };
+    return `<span style="background:var(--surface-2);color:var(--text-muted);padding:2px 8px;border-radius:10px;font-weight:600">${labels[motivo] || motivo}</span>`;
+}
 
 function fmtDate(dt) {
     if (!dt) {

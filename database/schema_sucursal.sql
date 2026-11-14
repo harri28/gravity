@@ -113,6 +113,8 @@ CREATE TABLE IF NOT EXISTS clientes (
     razon_social          VARCHAR(255),
     codigo_pais           VARCHAR(2) DEFAULT 'PE',
     ubigeo                VARCHAR(6),
+    fecha_nacimiento      DATE,
+    motivo                VARCHAR(30),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_clientes_numero_documento ON clientes (numero_documento);
