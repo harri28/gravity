@@ -17,7 +17,7 @@ $categorias = $db->query("SELECT id, nombre FROM public.categorias WHERE activo 
 
 include '../../includes/header.php';
 
-$ocultar_salidas = (sesionUsername() === 'almacen');
+$ocultar_salidas = isCajero();
 ?>
 
 <style>

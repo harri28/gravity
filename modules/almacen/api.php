@@ -96,6 +96,13 @@ function almacenConsultarDocumentoExterno(string $numero): array
     ];
 }
 
+// Cajeros no pueden ver ni mover el Registro de Salida.
+if (isCajero() && in_array($action, ['salidas_listar', 'salida_detalle', 'registrar_salida', 'anular_salida'], true)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'No autorizado']);
+    exit;
+}
+
 switch ($action) {
 
     // ================================================================
