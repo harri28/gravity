@@ -30,6 +30,25 @@ if (!$mesaId && !$comandaId) {
 }
 
 $db = getDB();
+
+// Datos del tenant + logo para el comprobante impreso post-cobro (igual que el POS)
+$_tenant_info = ['ruc' => '', 'telefono' => '', 'direccion' => ''];
+if (sesionTenantId()) {
+    $t = $db->prepare("SELECT ruc, telefono, direccion FROM public.tenants WHERE id = :id");
+    $t->execute([':id' => sesionTenantId()]);
+    $_tenant_info = $t->fetch() ?: $_tenant_info;
+}
+$_logo_data_uri = '';
+$_tenant_cfg = getTenantConfig();
+if (!empty($_tenant_cfg['logo_path'])) {
+    $logo_file = __DIR__ . '/../../' . $_tenant_cfg['logo_path'];
+    if (file_exists($logo_file)) {
+        $ext  = strtolower(pathinfo($logo_file, PATHINFO_EXTENSION));
+        $mime = ['png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg',
+                 'gif' => 'image/gif', 'webp' => 'image/webp'][$ext] ?? 'image/png';
+        $_logo_data_uri = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($logo_file));
+    }
+}
 $resueltaMesaId    = 0;
 $resueltaComandaId = null;
 
@@ -460,6 +479,29 @@ include '../../includes/header.php';
 .item-move:hover { color: var(--primary); background: var(--primary-light); }
 </style>
 
+<!-- MODAL: Comprobante de venta (post-cobro, igual que el POS) -->
+<div class="modal-overlay" id="modal-comprobante-mesa">
+    <div class="modal" style="max-width:380px">
+        <div class="modal-header">
+            <h3 class="modal-title"><i class="fas fa-check-circle" style="color:var(--success);margin-right:8px"></i>Venta Completada</h3>
+            <button class="modal-close" onclick="volverAMesas()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body" style="padding:16px;background:#e5e7eb;max-height:70vh;overflow-y:auto">
+            <div style="background:#fff;border-radius:4px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.15)">
+                <div id="comprobante-body-mesa"></div>
+            </div>
+        </div>
+        <div class="modal-footer" style="justify-content:center">
+            <button class="btn btn-outline btn-sm" style="flex:1;max-width:160px;justify-content:center;padding-top:14px;padding-bottom:14px" onclick="imprimirComprobanteMesa()">
+                <i class="fas fa-print"></i> Imprimir
+            </button>
+            <button class="btn btn-primary btn-sm" style="flex:1;max-width:160px;justify-content:center;padding-top:14px;padding-bottom:14px" onclick="volverAMesas()">
+                <i class="fas fa-plus"></i> Nueva Venta
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 // ---------------------------------------------------------------
 // Estado
@@ -632,6 +674,139 @@ function renderItems() {
 // Imprime el consumo actual de la mesa como pre-ticket para que el cliente lo
 // revise antes de pagar. NO cierra la mesa, NO crea venta, NO toca stock ni va
 // a SUNAT. Se puede reimprimir las veces que haga falta.
+// === Comprobante post-cobro (igual que el POS) ===
+const EMPRESA_NOMBRE  = <?= json_encode(sesionTenantNombre()) ?>;
+const EMPRESA_RUC     = <?= json_encode($_tenant_info['ruc']       ?? '') ?>;
+const EMPRESA_TEL     = <?= json_encode($_tenant_info['telefono']  ?? '') ?>;
+const EMPRESA_DIR     = <?= json_encode($_tenant_info['direccion'] ?? '') ?>;
+const EMPRESA_LOGO    = <?= json_encode($_logo_data_uri) ?>;
+const SUCURSAL_NOMBRE = <?= json_encode(sesionSucursal()) ?>;
+const VENDEDOR_NOMBRE = <?= json_encode(sesionNombre()) ?>;
+const PAGOS_MESA = { efectivo:'Efectivo', credito:'Crédito', yape:'Yape', plin:'Plin', tarjeta:'Visa/Mastercard', transferencia:'Transferencia' };
+
+function generarQrDataUri(texto, size) {
+    if (!texto || typeof QRCode === 'undefined') return '';
+    try {
+        const holder = document.createElement('div');
+        new QRCode(holder, { text: texto, width: size, height: size, correctLevel: QRCode.CorrectLevel.M });
+        const canvas = holder.querySelector('canvas');
+        if (canvas) return canvas.toDataURL('image/png');
+        const img = holder.querySelector('img');
+        return img ? img.src : '';
+    } catch (e) { return ''; }
+}
+
+function row2M(l, r) {
+    return `<div style="display:flex;justify-content:space-between;font-size:9pt;line-height:1.6"><span>${l}</span><span>${r}</span></div>`;
+}
+
+function buildComprobanteMesaHTML(data) {
+    const COMP = { boleta:'BOLETA DE VENTA ELECTRÓNICA', factura:'FACTURA ELECTRÓNICA', ticket:'TICKET DE VENTA' };
+    const compLabel = COMP[data.tipo_comprobante] || 'COMPROBANTE DE VENTA';
+    const numComp = (data.serie && data.correlativo)
+        ? (data.tipo_comprobante === 'ticket' ? `${data.serie}${data.correlativo}` : `${data.serie}-${data.correlativo}`)
+        : (data.numero_venta || '---');
+    const dt = data.created_at ? new Date(data.created_at) : new Date();
+    const fecha = dt.toLocaleDateString('es-PE', {day:'2-digit',month:'2-digit',year:'numeric'});
+    const hora  = dt.toLocaleTimeString('es-PE', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const nombreCliente = (data.razon_social || `${data.nombres||''} ${data.apellidos||''}`).trim();
+    const esDni = data.tipo_documento_codigo === '1';
+    const esRuc = data.tipo_documento_codigo === '6';
+    const esPorConsumo = data.por_consumo === true || data.por_consumo === 't';
+    const total = parseFloat(data.total || 0);
+    const igv = parseFloat(data.igv || 0);
+    const gravada = parseFloat(data.gravada || 0);
+    const exonerada = parseFloat(data.exonerada || 0);
+    const inafecta = parseFloat(data.inafecta || 0);
+
+    let itemsHtml;
+    if (esPorConsumo) {
+        itemsHtml = `<div style="margin-bottom:5px"><div style="display:flex;justify-content:space-between;font-size:9pt"><span style="flex:1;padding-right:6px">CONSUMO</span><span style="white-space:nowrap;font-weight:600">S/${total.toFixed(2)}</span></div></div>`;
+    } else {
+        itemsHtml = (data.items||[]).map(it => {
+            const qty = parseFloat(it.cantidad)||0;
+            const qtyTxt = Number.isInteger(qty) ? String(qty) : qty.toFixed(2);
+            const pu = parseFloat(it.precio_unitario)||0;
+            const sub = parseFloat(it.precio_total)|| (pu*qty);
+            const unid = it.unidad_medida_vendida || 'unid.';
+            return `<div style="margin-bottom:5px"><div style="display:flex;justify-content:space-between;font-size:9pt"><span style="flex:1;padding-right:6px;word-break:break-word">${escH(it.producto_nombre)}</span><span style="white-space:nowrap;font-weight:600">S/${sub.toFixed(2)}</span></div><div style="font-size:8pt">${qtyTxt} ${unid} x S/${pu.toFixed(2)}</div></div>`;
+        }).join('');
+    }
+
+    let bd = data.payment_breakdown;
+    if (typeof bd === 'string') { try { bd = JSON.parse(bd); } catch(e){ bd = null; } }
+    const pagosHtml = (Array.isArray(bd) && bd.length)
+        ? bd.map(p => row2M((PAGOS_MESA[(p.method||'').toLowerCase()]||p.method||'Pago')+':', `S/ ${parseFloat(p.amount||0).toFixed(2)}`)).join('')
+        : row2M((PAGOS_MESA[(data.tipo_pago||'').toLowerCase()]||data.tipo_pago||'Pago')+':', `S/ ${total.toFixed(2)}`);
+
+    const compUrl = data.comprobante_token
+        ? `${location.origin}${location.pathname.replace(/modules\/ventas\/mesa\.php.*$/, '')}mi-comprobante.php?t=${data.comprobante_token}`
+        : '';
+    const qrUri = compUrl ? generarQrDataUri(compUrl, 156) : '';
+
+    return `<div style="font-family:'Arial Narrow',Arial,Helvetica,sans-serif;color:#000;font-size:10pt;line-height:1.5;width:100%;font-weight:500">
+        <div style="text-align:center;margin-bottom:10px">
+            ${EMPRESA_LOGO ? `<div style="margin-bottom:4px"><img src="${EMPRESA_LOGO}" style="max-width:160px;max-height:80px;object-fit:contain"></div>` : `<div style="font-size:12pt;font-weight:900;text-transform:uppercase">${escH(EMPRESA_NOMBRE||'')}</div>`}
+            ${EMPRESA_RUC ? `<div style="font-size:9pt">RUC: ${escH(EMPRESA_RUC)}</div>`:''}
+            ${SUCURSAL_NOMBRE ? `<div style="font-size:9pt;font-weight:600">${escH(SUCURSAL_NOMBRE)}</div>`:''}
+            ${EMPRESA_DIR ? `<div style="font-size:8pt">${escH(EMPRESA_DIR)}</div>`:''}
+            ${EMPRESA_TEL ? `<div style="font-size:8pt">Tel: ${escH(EMPRESA_TEL)}</div>`:''}
+        </div>
+        <div style="border-top:2px solid #000;border-bottom:2px solid #000;text-align:center;padding:5px 0;margin-bottom:8px">
+            <div style="font-size:9pt;font-weight:700">${compLabel}</div>
+            <div style="font-size:9pt">${numComp}</div>
+        </div>
+        <div style="font-size:9pt;margin-bottom:6px">
+            <div>Fecha   : ${fecha} ${hora}</div>
+            <div>Cajero  : ${escH(VENDEDOR_NOMBRE||'')}</div>
+            ${nombreCliente ? `<div>Cliente : ${escH(nombreCliente)}</div>`:''}
+            ${esDni && data.numero_documento ? `<div>DNI     : ${escH(data.numero_documento)}</div>`:''}
+            ${esRuc && data.numero_documento ? `<div>RUC     : ${escH(data.numero_documento)}</div>`:''}
+        </div>
+        <div style="border-top:1px dashed #000;margin:6px 0"></div>
+        <div style="display:flex;justify-content:space-between;font-size:9pt;font-weight:700;margin-bottom:3px"><span>DESCRIPCIÓN</span><span>TOTAL</span></div>
+        <div style="border-top:1px dashed #000;margin:6px 0"></div>
+        <div style="margin-bottom:4px">${itemsHtml}</div>
+        <div style="border-top:1px dashed #000;margin:6px 0"></div>
+        <div style="font-size:9pt;margin:4px 0">
+            ${row2M('OP. GRAVADA:', `S/ ${gravada.toFixed(2)}`)}
+            ${exonerada>0 ? row2M('OP. EXONERADA:', `S/ ${exonerada.toFixed(2)}`):''}
+            ${inafecta>0 ? row2M('OP. INAFECTA:', `S/ ${inafecta.toFixed(2)}`):''}
+            ${row2M('IGV (18%)  :', `S/ ${igv.toFixed(2)}`)}
+        </div>
+        <div style="border-top:2px solid #000;margin:6px 0"></div>
+        <div style="display:flex;justify-content:space-between;font-size:12pt;font-weight:800"><span>TOTAL:</span><span>S/ ${total.toFixed(2)}</span></div>
+        <div style="border-top:2px solid #000;margin:6px 0"></div>
+        <div style="font-size:9pt;margin-top:5px">${pagosHtml}</div>
+        <div style="border-top:1px dashed #000;margin:6px 0"></div>
+        <div style="text-align:center;font-size:9pt;padding:4px 0"><div style="font-weight:700">BIENES TRANSFERIDOS EN LA AMAZONÍA PARA</div><div style="font-weight:700">SER CONSUMIDOS EN LA MISMA</div></div>
+        ${qrUri ? `<div style="display:flex;align-items:center;margin-top:8px"><div style="width:40%"><img src="${qrUri}" style="width:100%;max-width:117px;image-rendering:pixelated"></div><div style="width:60%;padding-left:8px;font-size:7.5pt;color:#333;word-break:break-all">Consulta tu comprobante:<br>${compUrl}</div></div>`:''}
+    </div>`;
+}
+
+let _comprobanteMesaHTML = '';
+function showComprobanteMesa(ventaId) {
+    fetch(`${API}?action=detalle_venta_ticket&id=${ventaId}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) { volverAMesas(); return; }
+            _comprobanteMesaHTML = buildComprobanteMesaHTML(data);
+            document.getElementById('comprobante-body-mesa').innerHTML = _comprobanteMesaHTML;
+            openModal('modal-comprobante-mesa');
+        })
+        .catch(() => { volverAMesas(); });
+}
+
+function imprimirComprobanteMesa() {
+    const w = window.open('', '_blank', 'width=420,height=700');
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}body{font-family:'Arial Narrow',Arial,Helvetica,sans-serif;font-size:9pt;width:80mm;margin:0 auto;padding:4mm 3mm;color:#000}img{image-rendering:-webkit-optimize-contrast}</style></head><body>${_comprobanteMesaHTML}</body></html>`);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 400);
+}
+
+function volverAMesas() { window.location = 'index.php'; }
+
 function buildPrecuentaHTML() {
     const total = ITEMS.reduce((s, it) => s + parseFloat(it.subtotal || 0), 0);
     const now = new Date();
@@ -1464,9 +1639,11 @@ async function confirmarVenta() {
     const idRef = d.numero_completo || d.numero_venta;
     const sunatSuffix = d.sunat_estado ? ` · SUNAT ${d.sunat_ok ? 'Aceptado' : d.sunat_estado}` : '';
     const vueltoSuffix = (d.vuelto > 0) ? ` · Vuelto ${soles(d.vuelto)}` : '';
-    const msg = `${(window.LABELS?.mesa?.s || 'Mesa')} #${d.mesa_numero} cobrada · ${idRef}${sunatSuffix}${vueltoSuffix}`;
-    sessionStorage.setItem('cobro_ok', msg);
-    window.location = 'index.php';
+    showToast(`${(window.LABELS?.mesa?.s || 'Mesa')} #${d.mesa_numero} cobrada · ${idRef}${sunatSuffix}${vueltoSuffix}`, 'success');
+    closeModal('modal-cobro');
+    // Igual que el POS: mostrar el comprobante con Imprimir + Nueva Venta.
+    // "Nueva Venta" / cerrar -> vuelve a la grilla de mesas (volverAMesas).
+    showComprobanteMesa(d.venta_id);
 }
 
 // ---------------------------------------------------------------
@@ -1507,6 +1684,7 @@ setInterval(cargarComanda, 60000);
 </script>
 
 <!-- jQuery + Select2 para el cliente dentro del modal #modal-cobro -->
+<script src="<?= $base_path ?>assets/vendor/qrcode/qrcode.min.js"></script>
 <script src="<?= $base_path ?>assets/vendor/jquery/jquery-3.7.1.min.js"></script>
 <script src="<?= $base_path ?>assets/vendor/select2/select2.min.js"></script>
 <script>
