@@ -16,6 +16,8 @@ $db = getDB();
 $categorias = $db->query("SELECT id, nombre FROM public.categorias WHERE activo = TRUE ORDER BY nombre")->fetchAll();
 
 include '../../includes/header.php';
+
+$ocultar_salidas = (sesionUsername() === 'almacen');
 ?>
 
 <style>
@@ -112,9 +114,11 @@ include '../../includes/header.php';
     <button class="alm-tab" id="tab-btn-ingresos"   onclick="switchTab('ingresos')">
         <i class="fas fa-truck-loading"></i> Ingresos de Stock
     </button>
+    <?php if (!$ocultar_salidas): ?>
     <button class="alm-tab" id="tab-btn-salidas"    onclick="switchTab('salidas')">
         <i class="fas fa-sign-out-alt"></i> Registro de Salida
     </button>
+    <?php endif; ?>
     <button class="alm-tab" id="tab-btn-almacen"    onclick="switchTab('almacen')">
         <i class="fas fa-boxes"></i> Almacén
     </button>
@@ -253,6 +257,7 @@ include '../../includes/header.php';
 </div><!-- /tab-ingresos -->
 
 <!-- ===================== TAB: SALIDAS ===================== -->
+<?php if (!$ocultar_salidas): ?>
 <div id="tab-salidas" style="display:none">
 
     <div class="card mb-4">
@@ -318,6 +323,7 @@ include '../../includes/header.php';
         </div>
     </div>
 </div><!-- /tab-salidas -->
+<?php endif; ?>
 
 <!-- ===================== TAB: ALMACÉN ===================== -->
 <div id="tab-almacen" style="display:none">
@@ -706,7 +712,9 @@ let trasladoItems = [];
 let sucursalesTraslado = [];
 
 // ---- Tabs ----
-const TABS = ['movimientos', 'ingresos', 'salidas', 'almacen', 'traslados'];
+const TABS = <?= json_encode($ocultar_salidas
+    ? ['movimientos', 'ingresos', 'almacen', 'traslados']
+    : ['movimientos', 'ingresos', 'salidas', 'almacen', 'traslados']) ?>;
 const TAB_CFG = {
     movimientos: { title: '<i class="fas fa-list" style="color:var(--primary);margin-right:8px"></i>Movimientos',                subtitle: 'Historial de todas las entradas y salidas de stock del almacén', actions: '' },
     ingresos:   { title: '<i class="fas fa-truck-loading" style="color:var(--primary);margin-right:8px"></i>Ingresos de Stock',  subtitle: 'Registra la recepción de mercadería de proveedores',       actions: '<button class="btn btn-primary" onclick="openNuevoIngreso()"><i class="fas fa-plus"></i> Nuevo Ingreso</button>' },
