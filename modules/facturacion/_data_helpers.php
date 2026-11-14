@@ -134,7 +134,65 @@ function facturacionCargarItemsVenta(PDO $db, int $ventaId): array
         throw new RuntimeException('La venta no tiene detalle para reenviar a SUNAT.');
     }
 
+    // "Por consumo": si la venta se marco asi, el comprobante se reenvia consolidado
+    // en una linea "CONSUMO" por afectacion (igual que el primer envio). El detalle
+    // real permanece en venta_detalles.
+    $pcStmt = $db->prepare("SELECT por_consumo FROM ventas WHERE id = :id");
+    $pcStmt->execute([':id' => $ventaId]);
+    $pc = $pcStmt->fetchColumn();
+    if ($pc === true || $pc === 't' || $pc === '1') {
+        $items = facturacionConsolidarPorConsumo($items);
+    }
+
     return $items;
+}
+
+/**
+ * Consolida los items de una venta en una sola linea "CONSUMO" por cada tipo de
+ * afectacion de IGV. Usado en el reenvio a SUNAT de ventas marcadas "por_consumo".
+ */
+function facturacionConsolidarPorConsumo(array $items): array
+{
+    $grupos = [];
+    foreach ($items as $it) {
+        $cod = trim((string) ($it['afectacion_igv_codigo'] ?? $it['afectacion_codigo'] ?? '10')) ?: '10';
+        if (!isset($grupos[$cod])) {
+            $grupos[$cod] = [
+                'producto_id'           => 0,
+                'nombre'                => 'CONSUMO',
+                'descripcion'           => 'CONSUMO',
+                'codigo'                => 'CONSUMO',
+                'codigo_interno'        => 'CONSUMO',
+                'codigo_sunat'          => '',
+                'cantidad'              => 1,
+                'unidad_codigo'         => 'ZZ',
+                'afectacion_igv_codigo' => $cod,
+                'afectacion_codigo'     => $cod,
+                'afectacion_tipo'       => strtoupper(trim((string) ($it['afectacion_tipo'] ?? ''))),
+                'precio_unitario'       => 0.0,
+                'valor_unitario'        => 0.0,
+                'valor_total'           => 0.0,
+                'precio_total'          => 0.0,
+                'igv'                   => 0.0,
+                'icbper'                => 0.0,
+                'descuento'             => 0.0,
+                'porcentaje_igv'        => (float) ($it['porcentaje_igv'] ?? 0),
+            ];
+        }
+        $grupos[$cod]['valor_total']  += (float) ($it['valor_total'] ?? 0);
+        $grupos[$cod]['igv']          += (float) ($it['igv'] ?? 0);
+        $grupos[$cod]['precio_total'] += (float) ($it['precio_total'] ?? 0);
+    }
+    $out = [];
+    foreach ($grupos as $g) {
+        $g['valor_total']     = round($g['valor_total'], 2);
+        $g['igv']             = round($g['igv'], 2);
+        $g['precio_total']    = round($g['precio_total'], 2);
+        $g['valor_unitario']  = $g['valor_total'];
+        $g['precio_unitario'] = round($g['valor_total'] + $g['igv'], 2);
+        $out[] = $g;
+    }
+    return $out;
 }
 
 /**

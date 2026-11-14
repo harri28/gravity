@@ -86,7 +86,7 @@ $brand = $brandStmt->fetch() ?: [];
 
 $ventaStmt = $pdo->prepare('
     SELECT v.id, v.numero_venta, v.tipo_comprobante, v.tipo_pago, v.subtotal, v.igv, v.descuento,
-           v.total, v.estado, v.created_at,
+           v.total, v.estado, v.created_at, v.por_consumo,
            c.numero_completo, c.tipo AS comp_tipo, c.estado_sunat, c.enlace_del_cdr,
            cl.nombres AS cliente_nombres, cl.apellidos AS cliente_apellidos,
            cl.razon_social AS cliente_razon_social, cl.numero_documento AS cliente_documento,
@@ -113,6 +113,21 @@ $detStmt = $pdo->prepare('
 ');
 $detStmt->execute([':vid' => $ventaId]);
 $items = $detStmt->fetchAll();
+
+// "Por consumo": el comprobante publico tambien muestra una sola linea "CONSUMO"
+// (el detalle real queda en venta_detalles; aqui no se expone).
+$esPorConsumo = (($venta['por_consumo'] ?? false) === true)
+    || in_array((string) ($venta['por_consumo'] ?? ''), ['t', '1', 'true'], true);
+if ($esPorConsumo) {
+    $consumoSubtotal = 0;
+    foreach ($items as $it) { $consumoSubtotal += (float) $it['subtotal']; }
+    $items = [[
+        'producto_nombre' => 'CONSUMO',
+        'cantidad'        => 1,
+        'precio_unitario' => $consumoSubtotal,
+        'subtotal'        => $consumoSubtotal,
+    ]];
+}
 
 $empresaNombre = $brand['business_name'] ?: ($brand['trade_name'] ?: ($brand['tenant_nombre'] ?? 'Gravity'));
 $numComp = $venta['numero_completo'] ?: $venta['numero_venta'];

@@ -265,7 +265,8 @@ function ventasCobrarComandaConSunat(
     float $montoRecibido,
     string $observaciones,
     int $cajaId,
-    array $paymentBreakdown = []
+    array $paymentBreakdown = [],
+    bool $porConsumo = false
 ): array {
     // --- Lock de comanda + items + info de mesa ---
     $cSt = $db->prepare("
@@ -405,7 +406,7 @@ function ventasCobrarComandaConSunat(
         INSERT INTO ventas (
             numero_venta, cliente_id, caja_id, usuario_id,
             subtotal, descuento, igv, total,
-            tipo_pago, tipo_comprobante, estado, vendedor, observaciones,
+            tipo_pago, tipo_comprobante, por_consumo, estado, vendedor, observaciones,
             fecha_emision, fecha_vencimiento, hora_emision, moneda_codigo,
             tipo_documento_id, codigo_tipo_documento, serie, correlativo,
             operacion_tipo_codigo, forma_pago_id, sunat_forma_pago,
@@ -415,7 +416,7 @@ function ventasCobrarComandaConSunat(
         ) VALUES (
             :nv, :ci, :cj, :ui,
             :sub, 0, :igv, :tot,
-            :tp, :tc, 'completada', :vn, :ob,
+            :tp, :tc, :pc, 'completada', :vn, :ob,
             CURRENT_DATE, CURRENT_DATE, CURRENT_TIME, 'PEN',
             :tdoc, :ctd, :srie, :cor,
             '0101', :fp, :sfp,
@@ -434,6 +435,7 @@ function ventasCobrarComandaConSunat(
         ':tot' => $total,
         ':tp'  => $tipoPago,
         ':tc'  => $tipoComp,
+        ':pc'  => $porConsumo ? 'true' : 'false',
         ':vn'  => sesionNombre() ?: 'Operador',
         ':ob'  => $observaciones !== '' ? $observaciones : "{$L_MESA_S} #{$comanda['mesa_num']}",
         ':tdoc' => $tipoDocId,
@@ -563,6 +565,60 @@ function ventasCobrarComandaConSunat(
         'sunat_forma_pago'  => $sunatFormaPago,
         'tipo_pago'         => $tipoPago,
     ];
+}
+
+/**
+ * "Por consumo": consolida los items en una sola linea "CONSUMO" por cada tipo de
+ * afectacion de IGV (gravado/exonerado/inafecto). El detalle real queda en
+ * venta_detalles; esto SOLO se usa para lo que se envia a SUNAT y para el comprobante
+ * impreso. Preserva los montos por afectacion para que los totales cuadren con el resumen.
+ */
+function ventasConsolidarPorConsumo(array $items): array
+{
+    $grupos = [];
+    foreach ($items as $it) {
+        $cod = trim((string) ($it['afectacion_codigo'] ?? $it['afectacion_igv_codigo'] ?? '10')) ?: '10';
+        if (!isset($grupos[$cod])) {
+            $grupos[$cod] = [
+                'producto_id'           => 0,
+                'cantidad'              => 1,
+                'precio_unitario'       => 0.0,
+                'descuento'             => 0.0,
+                'unidad_id'             => $it['unidad_id'] ?? null,
+                'unidad_codigo'         => 'ZZ',
+                'afectacion_id'         => $it['afectacion_id'] ?? null,
+                'afectacion_codigo'     => $cod,
+                'afectacion_igv_codigo' => $cod,
+                'afectacion_tipo'       => strtoupper(trim((string) ($it['afectacion_tipo'] ?? ''))),
+                'descripcion'           => 'CONSUMO',
+                'codigo_interno'        => 'CONSUMO',
+                'codigo_sunat'          => '',
+                'igv'                   => 0.0,
+                'valor_unitario'        => 0.0,
+                'valor_total'           => 0.0,
+                'precio_total'          => 0.0,
+                'icbper'                => 0.0,
+                'factor_icbper'         => 0,
+                'unidad_medida_vendida' => null,
+                'factor_equivalencia'   => 1,
+            ];
+        }
+        $grupos[$cod]['valor_total']  += (float) ($it['valor_total'] ?? 0);
+        $grupos[$cod]['igv']          += (float) ($it['igv'] ?? 0);
+        $grupos[$cod]['icbper']       += (float) ($it['icbper'] ?? 0);
+        $grupos[$cod]['precio_total'] += (float) ($it['precio_total'] ?? 0);
+    }
+    $out = [];
+    foreach ($grupos as $g) {
+        $g['valor_total']     = round($g['valor_total'], 2);
+        $g['igv']             = round($g['igv'], 2);
+        $g['icbper']          = round($g['icbper'], 2);
+        $g['precio_total']    = round($g['precio_total'], 2);
+        $g['valor_unitario']  = $g['valor_total'];
+        $g['precio_unitario'] = round($g['valor_total'] + $g['igv'], 2);
+        $out[] = $g;
+    }
+    return $out;
 }
 
 function ventasResolverFormaPagoId(PDO $db, string $tipoPago): ?int
@@ -1180,6 +1236,7 @@ switch ($action) {
         $montoRec    = round((float)($d['monto_recibido']     ?? 0), 2);
         $observac    = trim($d['observaciones'] ?? '');
         $clienteId   = !empty($d['cliente_id']) ? (int) $d['cliente_id'] : null;
+        $porConsumo  = !empty($d['por_consumo']);
 
         // Split payment: array opcional [{method, amount, account_id?}, ...].
         // Si viene, reemplaza el "pago simple" y se guarda en ventas.payment_breakdown.
@@ -1248,7 +1305,7 @@ switch ($action) {
                 $result = ventasCobrarComandaConSunat(
                     $db, $comandaId, $tipoComp, $tipoPago,
                     $clienteId, $montoRec, $observac, $cajaId,
-                    $paymentBreakdown
+                    $paymentBreakdown, $porConsumo
                 );
                 $db->commit();
             } catch (Exception $e) {
@@ -1276,8 +1333,9 @@ switch ($action) {
                 'moneda'           => 'PEN',
                 'totales'          => $result['resumen'],
             ];
+            $itemsSunatEnviar = $porConsumo ? ventasConsolidarPorConsumo($result['items_sunat']) : $result['items_sunat'];
             try {
-                $sunatResult = enviar_sunat($db, $cpeData, $result['cliente_info'], $result['items_sunat'], $ventaInfo);
+                $sunatResult = enviar_sunat($db, $cpeData, $result['cliente_info'], $itemsSunatEnviar, $ventaInfo);
             } catch (Throwable $e) {
                 $sunatResult = ['error_nubefact' => true, 'mensaje' => $e->getMessage()];
             }
@@ -1385,14 +1443,14 @@ switch ($action) {
                 INSERT INTO ventas (
                     numero_venta, caja_id, usuario_id,
                     subtotal, igv, total,
-                    tipo_pago, tipo_comprobante,
+                    tipo_pago, tipo_comprobante, por_consumo,
                     vuelto, payment_breakdown,
                     observaciones, vendedor, comanda_id,
                     estado
                 ) VALUES (
                     :nv, :ci, :ui,
                     :sub, 0, :tot,
-                    :tp, :tc,
+                    :tp, :tc, :pc,
                     :vu, :pb,
                     :ob, :vn, :cm,
                     'completada'
@@ -1402,6 +1460,7 @@ switch ($action) {
                 ':nv' => $numeroVenta, ':ci' => $cajaId, ':ui' => sesionId(),
                 ':sub' => $total, ':tot' => $total,
                 ':tp' => $tipoPago, ':tc' => $tipoComp,
+                ':pc' => $porConsumo ? 'true' : 'false',
                 ':vu' => $vuelto,
                 ':pb' => json_encode($pbTicket, JSON_UNESCAPED_UNICODE),
                 ':ob' => $observac !== '' ? $observac : "{$L_MESA_S} #{$comanda['mesa_num']}",
@@ -1706,6 +1765,7 @@ switch ($action) {
         $cajaId = $caja['id'];
 
         $tipoComp = trim((string) ($data['tipo_comprobante'] ?? 'ticket')) ?: 'ticket';
+        $porConsumo = !empty($data['por_consumo']);
         $tipoPago = trim((string) ($data['tipo_pago'] ?? 'efectivo')) ?: 'efectivo';
         $serieSolicitada = trim((string) ($data['serie'] ?? ''));
         $esCredito = !empty($data['es_credito']);
@@ -1991,7 +2051,7 @@ switch ($action) {
             $ventaStmt = $db->prepare("
                 INSERT INTO ventas (
                     numero_venta, cliente_id, caja_id, usuario_id, subtotal, descuento, igv, total,
-                    tipo_pago, tipo_comprobante, estado, vendedor, observaciones,
+                    tipo_pago, tipo_comprobante, por_consumo, estado, vendedor, observaciones,
                     fecha_emision, fecha_vencimiento, hora_emision, moneda_codigo,
                     tipo_documento_id, codigo_tipo_documento, serie, correlativo,
                     operacion_tipo_codigo, forma_pago_id, sunat_forma_pago,
@@ -2000,7 +2060,7 @@ switch ($action) {
                 )
                 VALUES (
                     :numero_venta, :cliente_id, :caja_id, :usuario_id, :subtotal, :descuento, :igv, :total,
-                    :tipo_pago, :tipo_comprobante, 'completada', :vendedor, :observaciones,
+                    :tipo_pago, :tipo_comprobante, :por_consumo, 'completada', :vendedor, :observaciones,
                     CURRENT_DATE, CURRENT_DATE, CURRENT_TIME, 'PEN',
                     :tipo_documento_id, :codigo_tipo_documento, :serie, :correlativo,
                     '0101', :forma_pago_id, :sunat_forma_pago,
@@ -2021,6 +2081,7 @@ switch ($action) {
                 ':total' => $total,
                 ':tipo_pago' => $tipoPago,
                 ':tipo_comprobante' => $tipoComp,
+                ':por_consumo' => $porConsumo ? 'true' : 'false',
                 ':observaciones' => $observaciones !== '' ? $observaciones : null,
                 ':tipo_documento_id' => $tipoDocumentoId,
                 ':codigo_tipo_documento' => $comprobanteMeta['codigo'],
@@ -2156,7 +2217,8 @@ switch ($action) {
                     'moneda' => 'PEN',
                     'totales' => $resumen,
                 ];
-                $comprobanteResult = enviar_sunat($db, $compData, $clienteInfo, $itemsSunat, $ventaInfo);
+                $itemsSunatEnviar = $porConsumo ? ventasConsolidarPorConsumo($itemsSunat) : $itemsSunat;
+                $comprobanteResult = enviar_sunat($db, $compData, $clienteInfo, $itemsSunatEnviar, $ventaInfo);
                 // Si fallo por error de red/timeout (no hay CDR y no hubo respuesta
                 // de SUNAT), programar el primer reintento para dentro de 5 minutos.
                 // El worker scripts/reenviar_sunat_pendientes.php lo tomara.
@@ -2280,7 +2342,7 @@ switch ($action) {
         $ventaStmt = $db->prepare("
             SELECT v.id, v.numero_venta, v.total, v.subtotal, v.descuento, v.igv,
                    v.gravada, v.exonerada, v.inafecta, v.vuelto, v.cuotas, v.payment_breakdown,
-                   v.tipo_pago, v.tipo_comprobante, v.estado, v.serie, v.correlativo, v.created_at,
+                   v.tipo_pago, v.tipo_comprobante, v.por_consumo, v.estado, v.serie, v.correlativo, v.created_at,
                    c.nombres, c.apellidos, c.razon_social, c.numero_documento, c.tipo_documento_codigo,
                    c.direccion, c.telefono
             FROM ventas v
