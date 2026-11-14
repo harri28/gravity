@@ -136,6 +136,12 @@ include '../../includes/header.php';
             <span style="font-size:.75rem;color:var(--text-muted)" id="items-count-txt">0 items</span>
         </div>
 
+        <div style="padding:8px 14px;border-bottom:1px solid var(--border)">
+            <button type="button" id="btn-por-consumo" class="btn btn-outline btn-sm" onclick="togglePorConsumoMesa()" style="width:100%;font-size:.78rem;display:flex;align-items:center;justify-content:center;gap:6px" title="Oculta el detalle de productos en el comprobante (se registra como CONSUMO). El historial conserva el detalle.">
+                <i class="fas fa-eye-slash"></i> Por consumo
+            </button>
+        </div>
+
         <div id="items-list" class="items-list">
             <div class="items-empty"><i class="fas fa-utensils"></i><br>Agrega el primer pedido desde el catalogo</div>
         </div>
@@ -468,6 +474,7 @@ const API = 'api.php';
 
 let COMANDA = null;
 let ITEMS = [];
+let porConsumoActivoMesa = false;
 let PRODUCTOS = [];
 let CATEGORIA_FILTRO = 0;
 let TEXT_FILTRO = '';
@@ -585,6 +592,24 @@ function tickCrono() {
 // ---------------------------------------------------------------
 // Render: lista de items
 // ---------------------------------------------------------------
+function togglePorConsumoMesa() {
+    porConsumoActivoMesa = !porConsumoActivoMesa;
+    aplicarPorConsumoMesa();
+}
+function aplicarPorConsumoMesa() {
+    const list = document.getElementById('items-list');
+    const btn = document.getElementById('btn-por-consumo');
+    if (list) list.style.opacity = porConsumoActivoMesa ? '.5' : '';
+    if (btn) {
+        btn.style.background = porConsumoActivoMesa ? 'var(--primary)' : '';
+        btn.style.color = porConsumoActivoMesa ? '#fff' : '';
+        btn.style.borderColor = porConsumoActivoMesa ? 'var(--primary)' : '';
+        btn.innerHTML = porConsumoActivoMesa
+            ? '<i class="fas fa-eye-slash"></i> Por consumo (activo)'
+            : '<i class="fas fa-eye-slash"></i> Por consumo';
+    }
+}
+
 function renderItems() {
     const list = document.getElementById('items-list');
     const totalItems = ITEMS.length;
@@ -1409,6 +1434,7 @@ async function confirmarVenta() {
     try {
         d = await postJson(`${API}?action=cobrar_comanda`, {
             comanda_id: COMANDA_ID,
+            por_consumo: porConsumoActivoMesa,
             tipo_comprobante: tipoComp,
             tipo_impresion: tipoImpr,
             serie: serie || null,
