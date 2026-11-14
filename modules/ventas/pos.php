@@ -289,8 +289,11 @@ include '../../includes/header.php';
                 <div id="ticket-body"></div>
             </div>
         </div>
-        <div class="modal-footer">
-            <button class="btn btn-primary" onclick="closeModal('modal-ticket');resetPOS()">
+        <div class="modal-footer" style="justify-content:center">
+            <button class="btn btn-outline btn-sm" style="flex:1;max-width:160px;justify-content:center;padding-top:14px;padding-bottom:14px" onclick="printReceipt(document.getElementById('ticket-body').innerHTML)">
+                <i class="fas fa-print"></i> Imprimir
+            </button>
+            <button class="btn btn-primary btn-sm" style="flex:1;max-width:160px;justify-content:center;padding-top:14px;padding-bottom:14px" onclick="closeModal('modal-ticket');resetPOS()">
                 <i class="fas fa-plus"></i> Nueva Venta
             </button>
         </div>
