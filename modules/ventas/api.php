@@ -783,6 +783,77 @@ switch ($action) {
             'items'   => $itSt->fetchAll(),
         ]);
 
+    case 'comanda_previsualizar':
+        // Previsualizar comprobante ANTES de cobrar: calcula el detalle tributario
+        // de la comanda abierta con los MISMOS helpers que cobrar_comanda
+        // (ventasCalcularDetalleTributario + ventasResumenDesdeDetalles), pero sin
+        // crear venta, sin tocar stock y sin ir a SUNAT. Asi la vista previa cuadra
+        // exactamente con el comprobante que se emitira.
+        $comandaId = intval($_GET['id'] ?? 0);
+        if (!$comandaId) {
+            jsonResponse(['error' => true, 'message' => 'Falta id de comanda'], 400);
+        }
+
+        $cSt = $db->prepare("SELECT id FROM comandas WHERE id = :id AND estado = 'abierta'");
+        $cSt->execute([':id' => $comandaId]);
+        if (!$cSt->fetch()) {
+            jsonResponse(['error' => true, 'message' => 'La comanda ya no esta abierta'], 404);
+        }
+
+        $itSt = $db->prepare("
+            SELECT id, producto_id, cantidad, precio_unitario
+            FROM comanda_items WHERE comanda_id = :c ORDER BY id ASC
+        ");
+        $itSt->execute([':c' => $comandaId]);
+        $itemsComanda = $itSt->fetchAll();
+        if (!$itemsComanda) {
+            jsonResponse(['error' => true, 'message' => 'La comanda esta vacia'], 400);
+        }
+
+        $prodSt = $db->prepare("
+            SELECT p.id, p.nombre, p.codigo, p.codigo_interno, p.codigo_sunat,
+                   p.precio_venta, p.unidad_id, p.unidad_codigo,
+                   p.afectacion_igv_id, p.afectacion_igv_codigo,
+                   p.porcentaje_igv, p.incluye_igv,
+                   p.icbper_activo, p.factor_icbper,
+                   a.tipo AS afectacion_tipo
+            FROM productos p
+            LEFT JOIN public.fe_tipos_afectacion_igv a ON a.id = p.afectacion_igv_id
+            WHERE p.id = :id
+        ");
+
+        $detalles   = [];
+        $itemsVista = [];
+        foreach ($itemsComanda as $itc) {
+            $prodSt->execute([':id' => $itc['producto_id']]);
+            $prod = $prodSt->fetch();
+            if (!$prod) { continue; }
+            $prod['precio_venta'] = (float) $itc['precio_unitario'];
+            $cantidad = (float) $itc['cantidad'];
+            $det = ventasCalcularDetalleTributario($prod, $cantidad);
+            $detalles[] = $det;
+            $itemsVista[] = [
+                'producto_nombre'       => $prod['nombre'],
+                'cantidad'              => $det['cantidad'],
+                'precio_unitario'       => $det['precio_unitario'],
+                'precio_total'          => $det['precio_total'],
+                'unidad_medida_vendida' => null,
+            ];
+        }
+
+        $resumen = ventasResumenDesdeDetalles($detalles);
+        jsonResponse([
+            'error'     => false,
+            'items'     => $itemsVista,
+            'subtotal'  => $resumen['subtotal'],
+            'gravada'   => $resumen['gravada'],
+            'exonerada' => $resumen['exonerada'],
+            'inafecta'  => $resumen['inafecta'],
+            'igv'       => $resumen['igv'],
+            'icbper'    => $resumen['icbper'],
+            'total'     => $resumen['total'],
+        ]);
+
     case 'comanda_agregar_item':
         // Agrega un producto a la comanda y descuenta stock en la MISMA transaccion
         // (requisito: stock se descuenta al pedir, no al cobrar). Usa FOR UPDATE

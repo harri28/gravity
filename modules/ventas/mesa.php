@@ -502,6 +502,29 @@ include '../../includes/header.php';
     </div>
 </div>
 
+<!-- Vista previa del comprobante (antes de cobrar). Cerrar vuelve al modal de cobro. -->
+<div class="modal-overlay" id="modal-preview-mesa">
+    <div class="modal" style="max-width:380px">
+        <div class="modal-header">
+            <h3 class="modal-title"><i class="fas fa-receipt" style="color:var(--primary);margin-right:8px"></i>Vista previa</h3>
+            <button class="modal-close" onclick="closeModal('modal-preview-mesa')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body" style="padding:16px;background:#e5e7eb;max-height:70vh;overflow-y:auto">
+            <div style="background:#fff;border-radius:4px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.15)">
+                <div id="preview-body-mesa"></div>
+            </div>
+        </div>
+        <div class="modal-footer" style="justify-content:center">
+            <button class="btn btn-outline btn-sm" style="flex:1;max-width:160px;justify-content:center;padding-top:14px;padding-bottom:14px" onclick="imprimirPreviewMesa()">
+                <i class="fas fa-print"></i> Imprimir
+            </button>
+            <button class="btn btn-primary btn-sm" style="flex:1;max-width:160px;justify-content:center;padding-top:14px;padding-bottom:14px" onclick="closeModal('modal-preview-mesa')">
+                <i class="fas fa-check"></i> Cerrar
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 // ---------------------------------------------------------------
 // Estado
@@ -1468,8 +1491,70 @@ function renderSplitPaymentPanel() {
 function addCreditInstallmentRow() {
     appAlert('Venta a credito desde mesa estara disponible pronto.', { tipo: 'info', titulo: 'Pronto disponible' });
 }
-function previsualizarComprobante() {
-    appAlert('Previsualizar comprobante estara disponible pronto en mesas.', { tipo: 'info', titulo: 'Pronto disponible' });
+// Vista previa del comprobante ANTES de cobrar. Pide al backend el detalle
+// tributario calculado con los mismos helpers que el cobro (para que cuadre con
+// el comprobante real) y lo arma con buildComprobanteMesaHTML. NO crea venta.
+let _previewMesaHTML = '';
+async function previsualizarComprobante() {
+    if (!ITEMS.length) { showToast('No hay items en la mesa', 'error'); return; }
+    if (!COMANDA_ID)   { showToast('La mesa aun no tiene comanda', 'error'); return; }
+
+    let resp;
+    try {
+        resp = await (await fetch(`${API}?action=comanda_previsualizar&id=${COMANDA_ID}`)).json();
+    } catch (e) {
+        showToast('No se pudo generar la vista previa', 'error'); return;
+    }
+    if (!resp || resp.error) {
+        showToast((resp && resp.message) || 'No se pudo generar la vista previa', 'error'); return;
+    }
+
+    // Cliente seleccionado (si hay) -> campos que lee buildComprobanteMesaHTML.
+    const cli = CLIENTE_SELECT || null;
+    const cliDoc = cli ? String(cli.ruc || cli.doc || cli.numero_documento || '').trim() : '';
+    const tipoDocCod = cli ? (cli.ruc ? '6' : (/^\d{8}$/.test(cliDoc) ? '1' : '')) : '';
+
+    // Metodos de pago (igual que confirmarVenta: split o metodo unico).
+    const splitData = splitPaymentEnabled ? getSplitPaymentPayload(round2(resp.total)) : null;
+    const tipoPago  = splitPaymentEnabled && splitData && splitData.rows.length
+        ? splitData.rows[0].method
+        : document.getElementById('tipo-pago').value;
+
+    const data = {
+        tipo_comprobante: document.getElementById('tipo-comprobante').value,
+        numero_venta: 'VISTA PREVIA',
+        created_at: new Date().toISOString(),
+        por_consumo: porConsumoActivoMesa,
+        items: resp.items || [],
+        subtotal: resp.subtotal,
+        gravada: resp.gravada,
+        exonerada: resp.exonerada,
+        inafecta: resp.inafecta,
+        igv: resp.igv,
+        total: resp.total,
+        tipo_pago: tipoPago,
+        payment_breakdown: splitData ? splitData.rows : [],
+        // Cliente
+        nombres: cli ? (cli.nombre || '') : '',
+        apellidos: '',
+        razon_social: '',
+        numero_documento: cliDoc,
+        tipo_documento_codigo: tipoDocCod,
+        // Sin token -> sin QR en la vista previa.
+        comprobante_token: null,
+    };
+
+    _previewMesaHTML = buildComprobanteMesaHTML(data);
+    document.getElementById('preview-body-mesa').innerHTML = _previewMesaHTML;
+    openModal('modal-preview-mesa');
+}
+
+function imprimirPreviewMesa() {
+    const w = window.open('', '_blank', 'width=420,height=700');
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}body{font-family:'Arial Narrow',Arial,Helvetica,sans-serif;font-size:9pt;width:80mm;margin:0 auto;padding:4mm 3mm;color:#000}img{image-rendering:-webkit-optimize-contrast}</style></head><body>${_previewMesaHTML}</body></html>`);
+    w.document.close();
+    w.focus();
+    setTimeout(() => { try { w.print(); } catch (e) {} }, 300);
 }
 // openModalNuevoCliente ahora vive en _modal_nuevo_cliente.php (partial compartido).
 // Esta funcion es el "contrato" que la modal invoca despues de guardar: le pasa
