@@ -365,7 +365,7 @@ $_sa_tema_oscuro = getSuperadminTemaOscuro();
                 <i class="fas fa-check-circle"></i> Marcar como pagado
             </button>
             <button class="btn-primary" onclick="abrirEditEmpresa()">
-                <i class="fas fa-pen"></i> Editar empresa
+                <i class="fas fa-pen"></i> Configurar banner
             </button>
             <button class="btn-cancel" onclick="abrirSunatInfo()"
                     style="display:inline-flex;align-items:center;gap:7px;background:#eef2ff;color:#4f46e5;border-color:#c7d2fe">
@@ -521,7 +521,7 @@ $_sa_tema_oscuro = getSuperadminTemaOscuro();
 <div class="modal-overlay" id="modalEmpresaOverlay">
     <div class="modal">
         <div class="modal-header">
-            <span class="modal-title">Editar empresa</span>
+            <span class="modal-title">Configurar banner</span>
             <button class="modal-close" onclick="cerrarModal()"><i class="fas fa-times"></i></button>
         </div>
         <div class="modal-body">
