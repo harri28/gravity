@@ -572,19 +572,12 @@ $_sa_tema_oscuro = getSuperadminTemaOscuro();
                         <input type="checkbox" id="eBannerActivo" style="width:auto;margin:0" <?= in_array($tenant['plan_banner_activo'] ?? false, [true, 't', 1, '1'], true) ? 'checked' : '' ?>>
                         Mostrar aviso de vencimiento al cliente
                     </label>
-                    <p style="font-size:.74rem;color:var(--sa-text-light);margin-top:5px">
-                        Apagado por defecto. Desactívalo para clientes con plan anual que no deben ver el aviso; la fecha se conserva.
-                    </p>
                 </div>
                 <div class="form-group" style="grid-column:1/-1">
                     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:.88rem;font-weight:500;width:auto">
                         <input type="checkbox" id="eBannerCancelado" style="width:auto;margin:0" <?= in_array($tenant['plan_banner_cancelado'] ?? false, [true, 't', 1, '1'], true) ? 'checked' : '' ?>>
                         A cancelado (ocultar banner)
                     </label>
-                    <p style="font-size:.74rem;color:var(--sa-text-light);margin-top:5px">
-                        Oculta el banner aunque el aviso esté activo (el cliente ya canceló / no debe verlo por ahora).
-                        Se reactiva solo cuando uses “Marcar como pagado”: reaparece 2 días antes del próximo vencimiento.
-                    </p>
                 </div>
                 <div class="form-group" style="grid-column:1/-1">
                     <label>Texto del banner</label>
