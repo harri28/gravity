@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS public.tenants (
     plan_vence_at DATE,
     plan_banner_activo BOOLEAN NOT NULL DEFAULT FALSE,
     plan_banner_mensaje TEXT,
+    plan_banner_cancelado BOOLEAN NOT NULL DEFAULT FALSE,
     activo        BOOLEAN   DEFAULT TRUE,
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

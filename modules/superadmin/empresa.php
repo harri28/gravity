@@ -577,6 +577,16 @@ $_sa_tema_oscuro = getSuperadminTemaOscuro();
                     </p>
                 </div>
                 <div class="form-group" style="grid-column:1/-1">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:.88rem;font-weight:500;width:auto">
+                        <input type="checkbox" id="eBannerCancelado" style="width:auto;margin:0" <?= in_array($tenant['plan_banner_cancelado'] ?? false, [true, 't', 1, '1'], true) ? 'checked' : '' ?>>
+                        A cancelado (ocultar banner)
+                    </label>
+                    <p style="font-size:.74rem;color:var(--sa-text-light);margin-top:5px">
+                        Oculta el banner aunque el aviso esté activo (el cliente ya canceló / no debe verlo por ahora).
+                        Se reactiva solo cuando uses “Marcar como pagado”: reaparece 2 días antes del próximo vencimiento.
+                    </p>
+                </div>
+                <div class="form-group" style="grid-column:1/-1">
                     <label>Texto del banner</label>
                     <textarea id="eBannerMensaje" rows="3" placeholder="Déjalo vacío para usar el texto automático (&quot;Tu plan vence mañana. Renueva tu suscripción...&quot;)"
                         style="width:100%;padding:9px 11px;background:var(--sa-surface);border:1.5px solid var(--sa-border);border-radius:8px;font-size:.88rem;color:var(--sa-text);outline:none;resize:vertical;font-family:inherit;transition:border-color .15s"
@@ -1158,11 +1168,12 @@ async function guardarEmpresa() {
     const plan_vence_at = document.getElementById('eVenceAt').value;
     const plan_banner_activo = document.getElementById('eBannerActivo').checked;
     const plan_banner_mensaje = document.getElementById('eBannerMensaje').value.trim();
+    const plan_banner_cancelado = document.getElementById('eBannerCancelado').checked;
     if (!nombre) { toast('El nombre es requerido','err'); return; }
 
     const r = await fetch(`${API}?action=tenant_actualizar`,{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({id:TENANT_ID,nombre,plan,plan_vence_at,plan_banner_activo,plan_banner_mensaje}),
+        body:JSON.stringify({id:TENANT_ID,nombre,plan,plan_vence_at,plan_banner_activo,plan_banner_mensaje,plan_banner_cancelado}),
     });
     const d = await r.json();
     if(d.error){toast(d.message,'err');return;}

@@ -380,24 +380,33 @@ endif;
 // Aviso de vencimiento del plan (configurado por Superadmin, por tenant)
 if (!isSuperadmin() && sesionId() > 0) {
     try {
-        $_plan_stmt = getDB()->prepare("SELECT plan_vence_at, plan_banner_activo, plan_banner_mensaje FROM public.tenants WHERE id = :tid");
+        $_plan_stmt = getDB()->prepare("SELECT plan_vence_at, plan_banner_activo, plan_banner_mensaje, plan_banner_cancelado FROM public.tenants WHERE id = :tid");
         $_plan_stmt->execute([':tid' => sesionTenantId()]);
-        $_plan_row    = $_plan_stmt->fetch();
-        $_plan_vence  = $_plan_row['plan_vence_at'] ?? null;
-        $_plan_activo = in_array($_plan_row['plan_banner_activo'] ?? false, [true, 't', 1, '1'], true);
-        $_plan_custom = trim((string) ($_plan_row['plan_banner_mensaje'] ?? ''));
+        $_plan_row       = $_plan_stmt->fetch();
+        $_plan_vence     = $_plan_row['plan_vence_at'] ?? null;
+        $_plan_activo    = in_array($_plan_row['plan_banner_activo'] ?? false, [true, 't', 1, '1'], true);
+        $_plan_cancelado = in_array($_plan_row['plan_banner_cancelado'] ?? false, [true, 't', 1, '1'], true);
+        $_plan_custom    = trim((string) ($_plan_row['plan_banner_mensaje'] ?? ''));
         // El interruptor manda: apagado = nunca se muestra, ni vencido.
-        if ($_plan_activo && !empty($_plan_vence)) {
+        // "A cancelado" oculta el banner aunque el aviso este activo (se resetea
+        // solo al "Marcar como pagado"). Ventana: 2 dias antes a 30 dias despues.
+        if ($_plan_activo && !$_plan_cancelado && !empty($_plan_vence)) {
             $_plan_dias = (int) floor((strtotime($_plan_vence) - strtotime(date('Y-m-d'))) / 86400);
-            if ($_plan_dias <= 7) {
-                if ($_plan_dias < 0) {
-                    $_plan_msg = 'Tu plan venció hace ' . abs($_plan_dias) . ' día' . (abs($_plan_dias) === 1 ? '' : 's') . '.';
-                } elseif ($_plan_dias === 0) {
-                    $_plan_msg = 'Tu plan vence hoy.';
+            if ($_plan_dias <= 2 && $_plan_dias >= -30) {
+                if ($_plan_dias === 2) {
+                    $_plan_msg = 'Tu servicio vence en dos días.';
                 } elseif ($_plan_dias === 1) {
-                    $_plan_msg = 'Tu plan vence mañana.';
+                    $_plan_msg = 'Tu servicio vence en un día.';
+                } elseif ($_plan_dias === 0) {
+                    $_plan_msg = 'Tu servicio vence hoy.';
+                } elseif ($_plan_dias === -1) {
+                    $_plan_msg = 'Tu servicio venció hace un día.';
+                } elseif ($_plan_dias === -2) {
+                    $_plan_msg = 'Tu servicio venció hace dos días.';
+                } elseif ($_plan_dias === -3) {
+                    $_plan_msg = 'Tu servicio venció hace tres días.';
                 } else {
-                    $_plan_msg = 'Tu plan vence en ' . $_plan_dias . ' días.';
+                    $_plan_msg = 'Tu servicio venció el día ' . date('d/m/Y', strtotime($_plan_vence)) . '.';
                 }
                 $_plan_bg     = $_plan_dias < 0 ? '#fef2f2' : '#fff7ed';
                 $_plan_border = $_plan_dias < 0 ? '#ef4444' : '#f97316';

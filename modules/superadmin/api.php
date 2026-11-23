@@ -112,6 +112,10 @@ switch ($action) {
             $sets[] = 'plan_banner_mensaje = :pbm';
             $params[':pbm'] = trim((string) $d['plan_banner_mensaje']) !== '' ? trim((string) $d['plan_banner_mensaje']) : null;
         }
+        if (array_key_exists('plan_banner_cancelado', $d)) {
+            $sets[] = 'plan_banner_cancelado = :pbc';
+            $params[':pbc'] = !empty($d['plan_banner_cancelado']) ? 'true' : 'false';
+        }
         $db->prepare('UPDATE public.tenants SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($params);
         jsonResponse(['error' => false, 'message' => 'Empresa actualizada']);
 
@@ -155,7 +159,9 @@ switch ($action) {
                 ':nuevo' => $nuevo,
                 ':por'   => sesionUsername() ?: sesionNombre(),
             ]);
-            $db->prepare("UPDATE public.tenants SET plan_vence_at = :nuevo WHERE id = :id")
+            // Al renovar, reactivamos el banner (quita "A cancelado"): volvera a
+            // mostrarse solo 2 dias antes del nuevo vencimiento.
+            $db->prepare("UPDATE public.tenants SET plan_vence_at = :nuevo, plan_banner_cancelado = FALSE WHERE id = :id")
                ->execute([':nuevo' => $nuevo, ':id' => $id]);
             $db->commit();
         } catch (Exception $e) {
