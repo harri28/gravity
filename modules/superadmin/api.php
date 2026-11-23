@@ -108,6 +108,10 @@ switch ($action) {
             $sets[] = 'plan_banner_activo = :pb';
             $params[':pb'] = !empty($d['plan_banner_activo']) ? 'true' : 'false';
         }
+        if (array_key_exists('plan_banner_mensaje', $d)) {
+            $sets[] = 'plan_banner_mensaje = :pbm';
+            $params[':pbm'] = trim((string) $d['plan_banner_mensaje']) !== '' ? trim((string) $d['plan_banner_mensaje']) : null;
+        }
         $db->prepare('UPDATE public.tenants SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($params);
         jsonResponse(['error' => false, 'message' => 'Empresa actualizada']);
 

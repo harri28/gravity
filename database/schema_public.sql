@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS public.tenants (
     sunat_server         VARCHAR(10),
     plan_vence_at DATE,
     plan_banner_activo BOOLEAN NOT NULL DEFAULT FALSE,
+    plan_banner_mensaje TEXT,
     activo        BOOLEAN   DEFAULT TRUE,
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

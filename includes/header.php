@@ -380,11 +380,12 @@ endif;
 // Aviso de vencimiento del plan (configurado por Superadmin, por tenant)
 if (!isSuperadmin() && sesionId() > 0) {
     try {
-        $_plan_stmt = getDB()->prepare("SELECT plan_vence_at, plan_banner_activo FROM public.tenants WHERE id = :tid");
+        $_plan_stmt = getDB()->prepare("SELECT plan_vence_at, plan_banner_activo, plan_banner_mensaje FROM public.tenants WHERE id = :tid");
         $_plan_stmt->execute([':tid' => sesionTenantId()]);
         $_plan_row    = $_plan_stmt->fetch();
         $_plan_vence  = $_plan_row['plan_vence_at'] ?? null;
         $_plan_activo = in_array($_plan_row['plan_banner_activo'] ?? false, [true, 't', 1, '1'], true);
+        $_plan_custom = trim((string) ($_plan_row['plan_banner_mensaje'] ?? ''));
         // El interruptor manda: apagado = nunca se muestra, ni vencido.
         if ($_plan_activo && !empty($_plan_vence)) {
             $_plan_dias = (int) floor((strtotime($_plan_vence) - strtotime(date('Y-m-d'))) / 86400);
@@ -404,8 +405,12 @@ if (!isSuperadmin() && sesionId() > 0) {
 ?>
 <div style="background:<?= $_plan_bg ?>;border-bottom:2px solid <?= $_plan_border ?>;padding:10px 24px;display:flex;align-items:center;justify-content:center;gap:10px;font-size:.88rem;color:<?= $_plan_fg ?>;text-align:center">
     <i class="fas fa-circle-exclamation" style="color:<?= $_plan_border ?>"></i>
-    <strong><?= htmlspecialchars($_plan_msg) ?></strong>
-    <span>Renueva tu suscripción para seguir disfrutando del servicio sin interrupciones.</span>
+    <?php if ($_plan_custom !== ''): ?>
+        <span><?= htmlspecialchars($_plan_custom) ?></span>
+    <?php else: ?>
+        <strong><?= htmlspecialchars($_plan_msg) ?></strong>
+        <span>Renueva tu suscripción para seguir disfrutando del servicio sin interrupciones.</span>
+    <?php endif; ?>
 </div>
 <?php
             }

@@ -145,8 +145,7 @@ $_sa_tema_oscuro = getSuperadminTemaOscuro();
         .stat-label { font-size: .78rem; color: var(--sa-text-muted); margin-top: 3px; }
 
         /* Sections */
-        .sections { display: grid; grid-template-columns: minmax(300px, max-content) minmax(0, 1fr); gap: 20px; align-items: start; }
-        @media (max-width: 1024px) { .sections { grid-template-columns: 1fr; } }
+        .sections { display: grid; grid-template-columns: 1fr; gap: 20px; align-items: start; }
 
         .section-card {
             background: var(--sa-surface); border: 1px solid var(--sa-border);
@@ -575,6 +574,16 @@ $_sa_tema_oscuro = getSuperadminTemaOscuro();
                     </label>
                     <p style="font-size:.74rem;color:var(--sa-text-light);margin-top:5px">
                         Apagado por defecto. Desactívalo para clientes con plan anual que no deben ver el aviso; la fecha se conserva.
+                    </p>
+                </div>
+                <div class="form-group" style="grid-column:1/-1">
+                    <label>Texto del banner</label>
+                    <textarea id="eBannerMensaje" rows="3" placeholder="Déjalo vacío para usar el texto automático (&quot;Tu plan vence mañana. Renueva tu suscripción...&quot;)"
+                        style="width:100%;padding:9px 11px;background:var(--sa-surface);border:1.5px solid var(--sa-border);border-radius:8px;font-size:.88rem;color:var(--sa-text);outline:none;resize:vertical;font-family:inherit;transition:border-color .15s"
+                        onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='var(--sa-border)'"><?= htmlspecialchars($tenant['plan_banner_mensaje'] ?? '') ?></textarea>
+                    <p style="font-size:.74rem;color:var(--sa-text-light);margin-top:5px">
+                        Si escribes aquí, este texto reemplaza TODO el banner (pierde el conteo automático de días).
+                        Vacío = texto automático según los días que falten para vencer.
                     </p>
                 </div>
             </div>
@@ -1148,11 +1157,12 @@ async function guardarEmpresa() {
     const plan         = document.getElementById('ePlan').value;
     const plan_vence_at = document.getElementById('eVenceAt').value;
     const plan_banner_activo = document.getElementById('eBannerActivo').checked;
+    const plan_banner_mensaje = document.getElementById('eBannerMensaje').value.trim();
     if (!nombre) { toast('El nombre es requerido','err'); return; }
 
     const r = await fetch(`${API}?action=tenant_actualizar`,{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({id:TENANT_ID,nombre,plan,plan_vence_at,plan_banner_activo}),
+        body:JSON.stringify({id:TENANT_ID,nombre,plan,plan_vence_at,plan_banner_activo,plan_banner_mensaje}),
     });
     const d = await r.json();
     if(d.error){toast(d.message,'err');return;}
