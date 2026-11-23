@@ -526,29 +526,6 @@ $_sa_tema_oscuro = getSuperadminTemaOscuro();
         </div>
         <div class="modal-body">
             <div class="form-row">
-                <div class="form-group">
-                    <label>Logo</label>
-                    <div style="display:flex;align-items:center;gap:14px">
-                        <div style="width:60px;height:60px;border-radius:10px;border:1px dashed var(--sa-text-light);display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--sa-surface-2);flex-shrink:0">
-                            <?php if (!empty($tenant['logo'])): ?>
-                                <img id="eLogoPreviewImg" src="../../<?= htmlspecialchars($tenant['logo']) ?>" alt="logo" style="width:100%;height:100%;object-fit:contain">
-                                <i id="eLogoIcon" class="fas fa-image" style="color:var(--sa-text-light);font-size:1.3rem;display:none"></i>
-                            <?php else: ?>
-                                <img id="eLogoPreviewImg" src="" alt="logo" style="display:none;width:100%;height:100%;object-fit:contain">
-                                <i id="eLogoIcon" class="fas fa-image" style="color:var(--sa-text-light);font-size:1.3rem"></i>
-                            <?php endif; ?>
-                        </div>
-                        <div style="flex:1">
-                            <label for="eLogoFile" style="display:inline-flex;align-items:center;gap:7px;cursor:pointer;background:var(--sa-bg);border:1px solid var(--sa-border);border-radius:8px;padding:7px 13px;font-size:.8rem;font-weight:600;color:var(--sa-text-secondary)">
-                                <i class="fas fa-upload"></i> Elegir imagen
-                            </label>
-                            <input type="file" id="eLogoFile" accept="image/*" style="display:none" onchange="ePreviewLogo(this)">
-                            <p id="eLogoFileName" style="font-size:.74rem;color:var(--sa-text-light);margin-top:5px">JPG, PNG, WEBP — máx. 2 MB</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="form-row">
                 <div class="form-group"><label>Nombre *</label><input type="text" id="eNombre" value="<?= htmlspecialchars($tenant['nombre']) ?>"></div>
             </div>
             <div class="form-row cols2">
@@ -1129,25 +1106,8 @@ async function toggleUsuario(id) {
     cargarUsuarios();
 }
 
-// ---- Editar empresa ----
-function ePreviewLogo(input) {
-    const file = input.files[0];
-    if (!file) return;
-    document.getElementById('eLogoFileName').textContent = file.name;
-    const reader = new FileReader();
-    reader.onload = e => {
-        const img  = document.getElementById('eLogoPreviewImg');
-        const icon = document.getElementById('eLogoIcon');
-        img.src = e.target.result;
-        img.style.display  = 'block';
-        icon.style.display = 'none';
-    };
-    reader.readAsDataURL(file);
-}
-
+// ---- Configurar banner ----
 function abrirEditEmpresa() {
-    document.getElementById('eLogoFile').value = '';
-    document.getElementById('eLogoFileName').textContent = 'JPG, PNG, WEBP — máx. 2 MB';
     document.getElementById('modalEmpresaOverlay').classList.add('active');
     setTimeout(()=>document.getElementById('eNombre').focus(),80);
 }
@@ -1167,22 +1127,6 @@ async function guardarEmpresa() {
     });
     const d = await r.json();
     if(d.error){toast(d.message,'err');return;}
-
-    // Subir logo si se eligió uno
-    const logoFile = document.getElementById('eLogoFile').files[0];
-    if (logoFile) {
-        const fd = new FormData();
-        fd.append('tenant_id', TENANT_ID);
-        fd.append('logo', logoFile);
-        const lr = await fetch(`${API}?action=tenant_logo_upload`, { method:'POST', body:fd });
-        const ld = await lr.json();
-        if (ld.error) { toast(ld.message,'err'); }
-        else {
-            // Actualizar logo en el hero sin recargar
-            const wrap = document.getElementById('heroLogoWrap');
-            wrap.innerHTML = `<img src="../../${ld.logo}" alt="logo" style="width:56px;height:56px;object-fit:contain;border-radius:14px">`;
-        }
-    }
 
     toast(d.message);
     cerrarModal();
